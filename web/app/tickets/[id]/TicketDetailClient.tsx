@@ -21,7 +21,6 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
   const [error, setError] = useState("");
 
   // Comment form
-  const [autor, setAutor] = useState("");
   const [cuerpo, setCuerpo] = useState("");
 
   const refresh = useCallback(async () => {
@@ -57,11 +56,11 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
 
   const submitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!autor.trim() || !cuerpo.trim()) return;
+    if (!cuerpo.trim()) return;
     setBusy(true);
     setError("");
     try {
-      await api.addComment(ticket.id, autor.trim(), cuerpo.trim());
+      await api.addComment(ticket.id, cuerpo.trim());
       setCuerpo("");
       await refresh();
     } catch (e) {
@@ -140,12 +139,6 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
         )}
 
         <form onSubmit={submitComment} className="mt-4 space-y-2">
-          <input
-            value={autor}
-            onChange={(e) => setAutor(e.target.value)}
-            placeholder="Tu nombre"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
           <textarea
             value={cuerpo}
             onChange={(e) => setCuerpo(e.target.value)}
@@ -155,7 +148,7 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
           />
           <button
             type="submit"
-            disabled={busy || !autor.trim() || !cuerpo.trim()}
+            disabled={busy || !cuerpo.trim()}
             className="rounded-md bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
           >
             Comentar

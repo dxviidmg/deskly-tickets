@@ -9,6 +9,7 @@ import { EstadoBadge, PrioridadBadge } from "@/components/Badges";
 import { TableSkeleton, EmptyState, ErrorState } from "@/components/UiStates";
 import { ConnectionIndicator } from "@/components/ConnectionIndicator";
 import { useTicketStream } from "@/hooks/useTicketStream";
+import { RequireAuth } from "@/components/RequireAuth";
 
 const PAGE_SIZE = 10;
 
@@ -22,6 +23,14 @@ const ESTADO_LABEL: Record<Estado, string> = {
 };
 
 export default function DashboardPage() {
+  return (
+    <RequireAuth>
+      <Dashboard />
+    </RequireAuth>
+  );
+}
+
+function Dashboard() {
   const [data, setData] = useState<Page<Ticket> | null>(null);
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState<string>("");

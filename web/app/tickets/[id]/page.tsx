@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { api, ApiError, TOKEN_COOKIE } from "@/lib/api";
 import { EstadoBadge, PrioridadBadge } from "@/components/Badges";
 import { TicketDetailClient } from "./TicketDetailClient";
 
 // Server Component: fetches the ticket on the server (SSR) so the first paint
-// already contains the ticket and its comments.
+// already contains the ticket and its comments. The JWT is read from the
+// cookie so the SSR request is authenticated.
 export default async function TicketDetailPage({
   params,
 }: {
@@ -14,8 +16,11 @@ export default async function TicketDetailPage({
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
+  const token = cookies().get(TOKEN_COOKIE)?.value ?? null;
+  if (!token) redirect("/login");
+
   try {
-    const ticket = await api.getTicket(id);
+    const ticket = await api.getTicket(id, token);
     return (
       <div>
         <Link href="/" className="text-sm text-blue-700 hover:underline">
@@ -44,6 +49,9 @@ export default async function TicketDetailPage({
     );
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
+    if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+      redirect("/login");
+    }
     throw e;
   }
 }
