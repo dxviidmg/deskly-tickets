@@ -270,3 +270,25 @@ compatible con passlib 1.7.4. Es un ajuste pequeño pero real; lo detecté al
 ejecutar los tests, y tras fijarlo la suite pasa completa (21 tests). Lo dejo
 documentado para que quien mantenga el proyecto sepa por qué esa versión está
 clavada.
+
+---
+
+### Frontend: token en cookie para que el SSR también esté autenticado
+
+**Contexto:** Con la API protegida por JWT, el frontend necesita enviar el token
+en cada petición. El detalle `/tickets/[id]` se renderiza en el servidor (SSR),
+así que el servidor también necesita el token para pedir el ticket.
+
+**Uso de LLM:** Le pedí el login y la protección de rutas en el frontend.
+
+**Salida del modelo:** La opción más simple era guardar el token en
+`localStorage`, pero eso solo existe en el navegador: el servidor no podría leerlo
+durante el SSR y la página de detalle fallaría con 401.
+
+**Mi decisión:** Guardo el token en una **cookie** (`deskly_token`) en lugar de
+`localStorage`. Así el navegador lo envía en sus peticiones y, en el SSR, el
+servidor lo lee de la cookie (`next/headers`) y hace la petición autenticada. Un
+contexto de autenticación (`AuthProvider`) mantiene el usuario actual, y un guard
+(`RequireAuth`) redirige a `/login` si no hay sesión y bloquea `/users` a los no
+administradores. Es una protección de conveniencia en el cliente; la seguridad
+real la impone el backend, que valida el JWT en cada endpoint.
