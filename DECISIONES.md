@@ -18,83 +18,91 @@ ejecuciones reales realizadas en esta sesión, no a suposiciones.
 
 **Contexto:** El enunciado deja la base de datos a mi elección (PostgreSQL o
 MongoDB) y pide justificar la decisión. El dominio son tickets con comentarios,
-filtros, paginación y un webhook idempotente.
+filtros y paginación.
 
-**Uso de LLM:** Le pedí al modelo que contrastara ambas opciones para este
-dominio concreto, enfocándose en integridad referencial, idempotencia del
-webhook y consultas con filtro/paginación. Quería un contraste, no una
-recomendación ciega.
+**Uso de LLM:** Le pedí al modelo que comparara ambas opciones para este caso
+concreto. Quería una comparación, no una recomendación a ciegas.
 
-**Salida del modelo:** Propuso PostgreSQL argumentando que el modelo es
-relacional (ticket 1—N comentarios), que la unicidad de `event_id` para
-idempotencia se resuelve con una constraint `UNIQUE`, y que los filtros del
-listado se benefician de índices B-tree. Señaló que MongoDB aportaría esquema
-flexible que aquí no se necesita.
+**Salida del modelo:** Propuso PostgreSQL porque los datos son relacionales (un
+ticket tiene muchos comentarios) y porque encaja bien con filtros y paginación.
+Señaló que la flexibilidad de MongoDB no aporta aquí.
 
-**Mi decisión:** Acepté PostgreSQL. El criterio decisivo para mí fue la
-**idempotencia del webhook**: con una constraint `UNIQUE(event_id)` delego la
-garantía a la base de datos en vez de implementar verificaciones manuales
-propensas a condiciones de carrera. La alternativa (MongoDB) la descarté porque
-su flexibilidad de esquema no aporta valor a un modelo estable y complicaría la
-relación con comentarios. Puedo defender el trade-off: si el requisito fuera
-documentos heterogéneos o escritura masiva sin relaciones, reconsideraría.
+**Mi decisión:** Elegí PostgreSQL por dos razones simples:
+
+1. **Los datos son relacionales.** Un ticket tiene comentarios asociados;
+   modelarlo como tablas con una clave foránea es lo natural y me da integridad
+   (si borro un ticket, sus comentarios se borran solos).
+2. **Evita duplicados en el webhook de forma sencilla.** Marco la columna
+   `event_id` como única (`UNIQUE`); así la propia base de datos impide guardar
+   dos veces el mismo evento, sin código extra.
+
+Descarté MongoDB porque su ventaja (esquema flexible) no la necesito: el modelo
+de un ticket es estable. Si el requisito fuera guardar documentos muy variables
+o escribir a gran escala sin relaciones, reconsideraría.
 
 ---
 
 ### [Decisión] Migraciones de esquema con Alembic
 
-**Contexto:** Necesito crear las tablas del backend de forma reproducible al
-levantar el sistema. Barajé dos enfoques: `Base.metadata.create_all` en el
-arranque (simple) o Alembic (migraciones versionadas, estándar de producción).
+**Contexto:** Necesito crear las tablas del backend al levantar el sistema. Hay
+dos caminos: crearlas automáticamente al arrancar (`create_all`) o usar Alembic,
+la herramienta de migraciones estándar.
 
-**Uso de LLM:** Le pedí al modelo que contrastara ambos para un prototipo y, tras
-decidir por Alembic, que configurara el entorno async de Alembic (`env.py` que
-lee la URL desde settings y usa `Base.metadata` como target) y autogenerara la
-migración inicial.
+**Uso de LLM:** Le pregunté al modelo si valía la pena añadir Alembic para este
+proyecto o si bastaba con crear las tablas al arrancar.
 
-**Salida del modelo:** Indicó que `create_all` es más simple pero no gestiona la
-evolución del esquema, mientras que Alembic aporta versionado y `upgrade`/
-`downgrade`. Generó el `env.py` async, la plantilla de scripts y, vía
-`alembic revision --autogenerate`, una migración inicial que detectó las tres
-tablas y los índices.
+**Salida del modelo:** El modelo dijo que **para un prototipo Alembic no era
+necesario**: bastaba con `create_all`, que es más simple. Señaló que Alembic
+aporta versionado del esquema y poder deshacer cambios (`downgrade`), pero lo
+presentó como algo opcional aquí.
 
-**Mi decisión:** Este punto tuvo un ida y vuelta real que documento con
-honestidad: primero opté por `create_all` por simplicidad, luego reconsideré y
-**decidí usar Alembic** como mecanismo definitivo. Criterios: (1) es el estándar
-que esperaría un equipo que "usa Docker, FastAPI y Next.js"; (2) deja el esquema
-versionado y con `downgrade`; (3) separa la creación del esquema del arranque de
-la app. Ajusté la migración autogenerada a mano en un punto: añadí
-`import app.types` porque el autogenerador referencia `app.types.GUID()` sin
-importarlo, y sin ese import la migración falla. Verifiqué el flujo completo
-contra SQLite: `alembic upgrade head` crea el esquema, `alembic current` reporta
-la cabeza, y `alembic downgrade base` revierte sin errores. En Docker, el
-contenedor ejecuta `alembic upgrade head` antes de arrancar uvicorn. El
-`create_all` quedó solo en la suite de tests (ver entrada sobre el wiring de
-tests), no en el arranque de producción.
+**Mi decisión:** **Pedí usar Alembic**, en contra de la sugerencia del modelo. El
+motivo es simple: **es el estándar en proyectos reales**. En un equipo, el
+esquema evoluciona y hay que aplicar cambios de forma controlada y repetible;
+empezar ya con migraciones versionadas es lo que haría en producción, no un
+atajo que luego habría que rehacer. Beneficios concretos que valoro: cada cambio
+de esquema queda registrado, se puede revertir, y la creación de tablas no
+depende del arranque de la app.
+
+Pedí entonces al modelo que configurara Alembic en modo async (un `env.py` que
+lee la URL de la base de datos desde la configuración) y que autogenerara la
+primera migración a partir de los modelos. Revisé el resultado y verifiqué el
+flujo completo contra SQLite: `alembic upgrade head` crea el esquema,
+`alembic current` muestra la versión, y `alembic downgrade base` lo revierte sin
+errores. La migración se regeneró al cambiar las claves a enteros
+autoincrementales (ver la entrada de IDs). En Docker se ejecutará
+`alembic upgrade head` antes de arrancar la app.
 
 ---
 
-### [Decisión] Tipo `GUID` portable en lugar de `UUID` nativo de PostgreSQL
+### [Decisión] IDs autoincrementales (enteros) en lugar de UUID
 
-**Contexto:** Los modelos usan UUID como PK. El tipo `UUID` de
-`sqlalchemy.dialects.postgresql` solo funciona en PostgreSQL, pero quiero correr
-los tests unitarios sin levantar PostgreSQL (más rápido y sin dependencias).
+**Contexto:** Cada tabla necesita una clave primaria (el identificador de cada
+fila). Las dos opciones habituales son un número que crece solo (1, 2, 3…,
+"autoincremental") o un UUID (un identificador largo tipo
+`550e8400-e29b-41d4-...`).
 
-**Uso de LLM:** Le pedí al modelo un `TypeDecorator` que usara UUID nativo en
-PostgreSQL y un equivalente en SQLite, para que el mismo esquema corriera en la
-suite de tests con SQLite en memoria/archivo.
+**Uso de LLM:** Al principio el modelo propuso usar UUID y, para poder correr los
+tests con SQLite, creó un tipo especial (`GUID`) que guardaba el UUID de forma
+nativa en PostgreSQL y como texto en SQLite.
 
-**Salida del modelo:** Propuso un `TypeDecorator` sobre `CHAR(36)` que delega a
-`UUID(as_uuid=True)` cuando el dialecto es `postgresql` y a `CHAR(36)` en otros
-casos, con conversión de ida y vuelta a `uuid.UUID`.
+**Salida del modelo:** Entregó ese tipo `GUID` portable y lo usó en todas las
+claves. Funcionaba, pero añadía una pieza extra al proyecto solo para que el
+mismo identificador encajara en dos bases de datos distintas.
 
-**Mi decisión:** Acepté el patrón, que conozco y puedo defender: es el enfoque
-canónico documentado por SQLAlchemy para tipos backend-agnósticos. El criterio
-fue **poder testear sin PostgreSQL**. Verifiqué que la lógica de `bind`/`result`
-convierte correctamente entre `str` y `uuid.UUID`. Trade-off: en SQLite el UUID
-se almacena como texto (CHAR(36)), lo cual es aceptable porque SQLite solo se usa
-en la suite de tests (en memoria con `StaticPool`). La verificación real lo
-confirma: los 14 tests corren sobre este tipo sin PostgreSQL.
+**Mi decisión:** Pedí cambiar todo a **IDs autoincrementales por simplicidad**.
+Razones: son más cortos y legibles, funcionan igual en PostgreSQL y en SQLite sin
+ningún tipo especial, y para un panel interno de soporte no necesito las ventajas
+del UUID. Con esto **eliminé el tipo `GUID`** y su complejidad. Verifiqué que la
+idempotencia del webhook **no se ve afectada**: no depende de la clave primaria,
+sino de la columna `event_id` marcada como única, que se mantiene igual. Tras el
+cambio regeneré la migración de Alembic (ahora las claves son enteros) y **los 14
+tests siguen pasando**, incluido el de idempotencia.
+
+Trade-off que asumo conscientemente: los IDs autoincrementales son "adivinables"
+(alguien puede probar `/tickets/1`, `/tickets/2`…). Para este prototipo interno
+es aceptable; si el sistema fuera público y hubiera que ocultar cuántos tickets
+existen o evitar accesos por id, volvería a considerar UUID.
 
 ---
 
