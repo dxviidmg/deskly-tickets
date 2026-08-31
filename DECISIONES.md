@@ -1,220 +1,199 @@
 # DECISIONES
 
-Bitácora de decisiones técnicas de Deskly. Cada entrada sigue el formato pedido
-en el enunciado: contexto, uso de LLM (qué pedí y por qué), salida del modelo, y
-mi decisión (qué acepté, modifiqué o descarté y con qué criterio).
+Registro de las decisiones técnicas de Deskly. Cada entrada tiene el mismo
+formato: **Contexto**, **Uso de LLM**, **Salida del modelo** y **Mi decisión**.
+El objetivo es explicar *por qué* se hizo cada cosa, en lenguaje claro.
 
-Nota sobre el uso de LLM en este proyecto: usé un asistente de código (Kiro,
-sobre un modelo tipo Claude) para acelerar la escritura y el diagnóstico. La
-política del reto permite su uso sin límite; lo relevante es que pueda defender
-cada línea. Donde acepté algo sin comprenderlo del todo, o donde hubo un ida y
-vuelta (p. ej. Alembic), lo digo explícitamente. Las afirmaciones de verificación
-("14 tests pasan", "upgrade/downgrade de Alembic funcionan") corresponden a
-ejecuciones reales realizadas en esta sesión, no a suposiciones.
+Sobre el uso de LLM: usé un asistente de código (Kiro) para escribir y diagnosticar
+más rápido. Está permitido por el reto. Lo importante es que las decisiones son
+mías y puedo defenderlas. Cuando el modelo propuso una cosa y yo pedí cambiarla,
+lo digo tal cual. Las frases de verificación ("14 tests pasan", "Redis funciona")
+son ejecuciones reales de esta sesión, no suposiciones.
 
 ---
 
-### [Decisión] Base de datos: PostgreSQL en lugar de MongoDB
+### Base de datos: PostgreSQL en lugar de MongoDB
 
-**Contexto:** El enunciado deja la base de datos a mi elección (PostgreSQL o
-MongoDB) y pide justificar la decisión. El dominio son tickets con comentarios,
-filtros y paginación.
+**Contexto:** El reto me deja elegir entre PostgreSQL o MongoDB. Los datos son
+tickets con comentarios, con filtros y paginación.
 
-**Uso de LLM:** Le pedí al modelo que comparara ambas opciones para este caso
-concreto. Quería una comparación, no una recomendación a ciegas.
+**Uso de LLM:** Le pedí que comparara las dos opciones para este caso.
 
-**Salida del modelo:** Propuso PostgreSQL porque los datos son relacionales (un
-ticket tiene muchos comentarios) y porque encaja bien con filtros y paginación.
-Señaló que la flexibilidad de MongoDB no aporta aquí.
+**Salida del modelo:** Recomendó PostgreSQL porque los datos son relacionales (un
+ticket tiene varios comentarios) y encaja bien con filtros y paginación.
 
-**Mi decisión:** Elegí PostgreSQL por dos razones simples:
+**Mi decisión:** Elegí PostgreSQL, por dos razones fáciles:
+1. Los datos están relacionados: un ticket tiene comentarios. Con tablas y una
+   clave foránea es lo natural, y si borro un ticket sus comentarios se borran
+   solos.
+2. Evita duplicados en el webhook sin esfuerzo: marco `event_id` como único y la
+   base de datos ya impide guardar dos veces el mismo evento.
 
-1. **Los datos son relacionales.** Un ticket tiene comentarios asociados;
-   modelarlo como tablas con una clave foránea es lo natural y me da integridad
-   (si borro un ticket, sus comentarios se borran solos).
-2. **Evita duplicados en el webhook de forma sencilla.** Marco la columna
-   `event_id` como única (`UNIQUE`); así la propia base de datos impide guardar
-   dos veces el mismo evento, sin código extra.
-
-Descarté MongoDB porque su ventaja (esquema flexible) no la necesito: el modelo
-de un ticket es estable. Si el requisito fuera guardar documentos muy variables
-o escribir a gran escala sin relaciones, reconsideraría.
+Descarté MongoDB porque su punto fuerte (esquema flexible) no lo necesito: un
+ticket siempre tiene los mismos campos.
 
 ---
 
-### [Decisión] Migraciones de esquema con Alembic
+### Migraciones con Alembic (el modelo dijo que no hacía falta; yo lo pedí)
 
-**Contexto:** Necesito crear las tablas del backend al levantar el sistema. Hay
-dos caminos: crearlas automáticamente al arrancar (`create_all`) o usar Alembic,
-la herramienta de migraciones estándar.
+**Contexto:** Hay que crear las tablas al levantar el backend. Se puede hacer
+automáticamente al arrancar, o con Alembic, que es la herramienta estándar de
+migraciones.
 
-**Uso de LLM:** Le pregunté al modelo si valía la pena añadir Alembic para este
-proyecto o si bastaba con crear las tablas al arrancar.
+**Uso de LLM:** Le pregunté si valía la pena usar Alembic o bastaba con crear las
+tablas al arrancar.
 
-**Salida del modelo:** El modelo dijo que **para un prototipo Alembic no era
-necesario**: bastaba con `create_all`, que es más simple. Señaló que Alembic
-aporta versionado del esquema y poder deshacer cambios (`downgrade`), pero lo
-presentó como algo opcional aquí.
+**Salida del modelo:** Dijo que para un prototipo **no era necesario** Alembic, que
+bastaba con crear las tablas al arrancar (más simple). Así lo dejó al principio.
 
-**Mi decisión:** **Pedí usar Alembic**, en contra de la sugerencia del modelo. El
-motivo es simple: **es el estándar en proyectos reales**. En un equipo, el
-esquema evoluciona y hay que aplicar cambios de forma controlada y repetible;
-empezar ya con migraciones versionadas es lo que haría en producción, no un
-atajo que luego habría que rehacer. Beneficios concretos que valoro: cada cambio
-de esquema queda registrado, se puede revertir, y la creación de tablas no
-depende del arranque de la app.
-
-Pedí entonces al modelo que configurara Alembic en modo async (un `env.py` que
-lee la URL de la base de datos desde la configuración) y que autogenerara la
-primera migración a partir de los modelos. Revisé el resultado y verifiqué el
-flujo completo contra SQLite: `alembic upgrade head` crea el esquema,
-`alembic current` muestra la versión, y `alembic downgrade base` lo revierte sin
-errores. La migración se regeneró al cambiar las claves a enteros
-autoincrementales (ver la entrada de IDs). En Docker se ejecutará
-`alembic upgrade head` antes de arrancar la app.
+**Mi decisión:** **Le pedí cambiarlo y usar Alembic.** Mi razón: es el estándar en
+proyectos reales. En un equipo el esquema cambia con el tiempo, y tener las
+migraciones versionadas desde el principio es lo correcto, no un atajo que después
+toca rehacer. Con Alembic cada cambio queda registrado y se puede deshacer.
+Configuramos Alembic, generamos la primera migración y comprobé que funciona:
+crea las tablas y también las revierte sin errores. En Docker se ejecuta antes de
+arrancar la app.
 
 ---
 
-### [Decisión] IDs autoincrementales (enteros) en lugar de UUID
+### IDs numéricos autoincrementales (el modelo usó UUID; yo lo pedí cambiar)
 
-**Contexto:** Cada tabla necesita una clave primaria (el identificador de cada
-fila). Las dos opciones habituales son un número que crece solo (1, 2, 3…,
-"autoincremental") o un UUID (un identificador largo tipo
-`550e8400-e29b-41d4-...`).
+**Contexto:** Cada tabla necesita un identificador. Puede ser un número que crece
+solo (1, 2, 3…) o un UUID (un código largo como `550e8400-e29b-...`).
 
-**Uso de LLM:** Al principio el modelo propuso usar UUID y, para poder correr los
-tests con SQLite, creó un tipo especial (`GUID`) que guardaba el UUID de forma
-nativa en PostgreSQL y como texto en SQLite.
+**Uso de LLM:** Le pedí el modelo de datos.
 
-**Salida del modelo:** Entregó ese tipo `GUID` portable y lo usó en todas las
-claves. Funcionaba, pero añadía una pieza extra al proyecto solo para que el
-mismo identificador encajara en dos bases de datos distintas.
+**Salida del modelo:** Al principio usó **UUID** y, para que los tests con SQLite
+funcionaran, tuvo que crear un tipo especial de columna que guardaba el UUID de
+forma distinta en PostgreSQL y en SQLite. Funcionaba, pero era una pieza extra.
 
-**Mi decisión:** Pedí cambiar todo a **IDs autoincrementales por simplicidad**.
-Razones: son más cortos y legibles, funcionan igual en PostgreSQL y en SQLite sin
-ningún tipo especial, y para un panel interno de soporte no necesito las ventajas
-del UUID. Con esto **eliminé el tipo `GUID`** y su complejidad. Verifiqué que la
-idempotencia del webhook **no se ve afectada**: no depende de la clave primaria,
-sino de la columna `event_id` marcada como única, que se mantiene igual. Tras el
-cambio regeneré la migración de Alembic (ahora las claves son enteros) y **los 14
-tests siguen pasando**, incluido el de idempotencia.
+**Mi decisión:** **Le pedí cambiar todo a IDs numéricos autoincrementales, por
+simplicidad.** Son más cortos, más fáciles de leer y funcionan igual en PostgreSQL
+y SQLite sin ningún tipo especial, que se pudo eliminar. Para un panel interno de
+soporte no necesito lo que aporta el UUID. Comprobé que la idempotencia del webhook
+**no se ve afectada**, porque depende de la columna `event_id` (única), no del
+identificador de la fila. Tras el cambio, los 14 tests siguen pasando.
 
-Trade-off que asumo conscientemente: los IDs autoincrementales son "adivinables"
-(alguien puede probar `/tickets/1`, `/tickets/2`…). Para este prototipo interno
-es aceptable; si el sistema fuera público y hubiera que ocultar cuántos tickets
-existen o evitar accesos por id, volvería a considerar UUID.
+Lo que asumo: los IDs numéricos son "adivinables" (se puede probar `/tickets/1`,
+`/tickets/2`…). Para un prototipo interno es aceptable; si fuera público y quisiera
+ocultar esa información, volvería a UUID.
 
 ---
 
-### [Decisión] Orden de verificación en el webhook: firma (401) antes que forma (422)
+### Webhook: primero la firma (401), luego el contenido (422)
 
-**Contexto:** El webhook debe devolver 401 si la firma HMAC es inválida y 422 si
-el payload está malformado. El orden de las comprobaciones cambia el código de
-respuesta ante una petición que falla en ambas.
+**Contexto:** El webhook debe responder 401 si la firma es inválida y 422 si el
+contenido está mal. Como una misma petición puede fallar en las dos cosas, el orden
+importa.
 
-**Uso de LLM:** Ninguno directo en esta decisión; fue un requisito explícito del
-enunciado que interpreté yo.
+**Uso de LLM:** Sin LLM. Fue un requisito del enunciado que decidí yo.
 
-**Salida del modelo:** Sin LLM.
+**Salida del modelo:** Sin LLM en esta decisión.
 
-**Mi decisión:** Verifico **primero la firma sobre el cuerpo crudo** y solo si es
-válida valido el payload con Pydantic. Criterio de seguridad: no se debe dar
-información sobre la forma del payload a un cliente que ni siquiera prueba ser
-legítimo. Por eso un payload malformado con firma inválida devuelve 401, no 422.
-Uso `hmac.compare_digest` para comparar en tiempo constante y evitar ataques de
-temporización.
+**Mi decisión:** Primero compruebo la firma; solo si es válida reviso el contenido.
+Es una cuestión de seguridad: a quien no demuestra ser un remitente legítimo no le
+doy pistas sobre el formato del mensaje, lo corto con 401. El secreto de la firma
+vive en una variable de entorno (`.env`), nunca en el código, y la comparación se
+hace de forma segura para no filtrar información.
 
 ---
 
-### [Decisión] WebSocket con `ConnectionManager` en memoria (sin Redis pub/sub)
+### Tiempo real con Redis (el modelo lo hizo en memoria; yo pedí Redis)
 
-**Contexto:** Hay que emitir eventos en tiempo real a los agentes conectados.
-Una solución escalable a múltiples procesos usaría un bus externo (Redis).
+**Contexto:** Cuando se crea, actualiza o comenta un ticket, hay que avisar en el
+momento a los agentes conectados por WebSocket. Cada instancia del backend guarda
+sus conexiones en su propia memoria, así que con más de una instancia un aviso
+generado en una no llegaría a los clientes de otra.
 
-**Uso de LLM:** Le pedí al modelo un `ConnectionManager` que registrara
-conexiones y difundiera eventos, con desconexión limpia (sin errores silenciosos
-cuando un cliente cae).
+**Uso de LLM:** Le pedí el sistema de avisos en tiempo real.
 
-**Salida del modelo:** Propuso una clase con un conjunto de conexiones protegido
-por un lock asíncrono, un método `broadcast` que serializa el evento y elimina
-las conexiones que fallan al enviar.
+**Salida del modelo:** Al principio lo implementó **en memoria**: una lista de
+conexiones a la que se le manda el aviso, con desconexión limpia (si un cliente
+falla, se quita en vez de romper). Comentó que Redis quedaba "fuera de alcance".
 
-**Mi decisión:** Acepté la estructura y añadí el criterio de "desconexión limpia"
-del enunciado: si `send_json` falla, marco esa conexión para eliminarla en lugar
-de propagar el error. Descarté Redis pub/sub **conscientemente**: el enunciado no
-pide escalado horizontal y añadiría un servicio más al `docker-compose`. Lo
-documento como limitación conocida: el manager vive en la memoria de un proceso;
-con múltiples workers habría que externalizar el estado.
+**Mi decisión:** **Le pedí cambiarlo para usar Redis.** Mis razones: **escalabilidad**
+(permite tener varias instancias del backend a la vez) y porque **es lo habitual en
+proyectos reales** de tiempo real. Con Redis, los avisos se publican en un canal y
+todas las instancias lo escuchan; cada una reenvía el aviso a sus propios clientes,
+así llega a todos. Mantuve la desconexión limpia.
 
----
-
-### [Decisión] Python 3.12 gestionado con `uv` (la máquina tiene 3.14 por defecto)
-
-**Contexto:** Mi máquina tiene **Python 3.14 por defecto**. Al intentar instalar
-las dependencias en local, `pydantic-core` (PyO3 ≤ 3.13) y `asyncpg` no tienen
-wheels ni compilan para 3.14 (además faltaban cabeceras `Python.h`). No podía
-crear el entorno ni correr los tests con el intérprete del sistema.
-
-**Uso de LLM:** Le pedí al modelo que diagnosticara el error de compilación y que
-propusiera una forma de obtener un intérprete compatible sin modificar el sistema.
-
-**Salida del modelo:** Diagnosticó que PyO3 0.22 no soporta 3.14 (rompe
-`pydantic-core`) y que faltaban cabeceras para compilar `asyncpg`. Detectó que
-`uv` ya estaba instalado y propuso usarlo para instalar un Python 3.12 gestionado
-y crear el venv con él.
-
-**Mi decisión:** No degradé ni parcheé el Python del sistema. Usé
-`uv python install 3.12` + `uv venv --python 3.12` para obtener un intérprete
-3.12 aislado y ahí instalé las dependencias (todas con wheels precompiladas) y
-**ejecuté la suite: 14 tests pasan** (máquina de estados válida/inválida y
-webhook con firma válida/inválida, payload malformado e idempotencia). Criterio:
-3.12 es además la versión de la imagen base del contenedor (`python:3.12-slim`),
-así que el entorno local de verificación coincide con el de Docker. Fijo las
-dependencias pensando en 3.12.
+Lo dejé tolerante a fallos: si Redis no está disponible (por ejemplo en los tests o
+en local sin Redis), el sistema avisa solo a los clientes de esa instancia y todo
+sigue funcionando. Lo verifiqué de verdad: levanté un Redis en Docker y comprobé que
+un aviso publicado llega al cliente; y que los 14 tests pasan sin Redis.
 
 ---
 
-### [Decisión] Wiring de tests: `dependency_overrides` tras descartar `importlib.reload`
+### Entorno de desarrollo: Python 3.12 con `uv` (mi máquina trae 3.14)
 
-**Contexto:** Los tests del webhook necesitan que la app FastAPI use una base de
-datos de test (SQLite) en lugar de PostgreSQL. Mi primer intento reconfiguraba el
-módulo de DB recargándolo con `importlib.reload`.
+**Contexto:** Mi máquina tiene Python 3.14 por defecto. Al instalar las
+dependencias fallaban dos de ellas porque todavía no son compatibles con 3.14.
 
-**Uso de LLM:** Le pedí al modelo un `conftest.py` que apuntara la app a SQLite
-para los tests. La primera propuesta usaba `importlib.reload` de los módulos de
-DB y modelos.
+**Uso de LLM:** Le pedí que diagnosticara el error y propusiera una salida sin tocar
+el Python del sistema.
 
-**Salida del modelo:** Primero entregó el enfoque con `importlib.reload`. Al
-ejecutarlo falló con `Table 'tickets' is already defined for this MetaData
-instance`, porque recargar `models` redefine las tablas sobre el mismo
-`Base.metadata`.
+**Salida del modelo:** Explicó que dos librerías no soportan aún 3.14. Vio que la
+herramienta `uv` ya estaba instalada y propuso usarla para instalar un Python 3.12
+aparte.
 
-**Mi decisión:** Descarté el enfoque de recarga (frágil y con efectos colaterales
-sobre el metadata global) y lo reemplacé por el patrón idiomático de FastAPI:
-`app.dependency_overrides[get_session]` apuntando a un `AsyncSession` sobre un
-engine SQLite en memoria con `StaticPool`, y `Base.metadata.create_all` una sola
-vez por test. Reconozco abiertamente que la primera versión estaba mal; la detecté
-al ejecutar la suite (no por inspección). Tras el cambio: **14 tests pasan sin
-warnings**. Aprovecho `StaticPool` para que la única conexión en memoria persista
-durante todo el test.
+**Mi decisión:** No toqué el Python del sistema. Usé `uv` para instalar un Python
+3.12 aislado y ahí monté el entorno; con eso instalé todo y ejecuté los tests
+(14 pasan). Además 3.12 es la misma versión que usa la imagen de Docker, así que lo
+que verifico en local coincide con lo que correrá en el contenedor.
 
 ---
 
-### [Decisión] Enums de dominio como `String(20)` en lugar del tipo `ENUM` nativo
+### Tests: cómo conecto la app a una base de datos de prueba
 
-**Contexto:** `estado` y `prioridad` son conjuntos cerrados de valores. PostgreSQL
-ofrece un tipo `ENUM` nativo; SQLAlchemy también puede mapear `Enum` de Python.
+**Contexto:** Los tests del webhook necesitan que la app use una base de datos de
+prueba (SQLite) en vez de PostgreSQL.
 
-**Uso de LLM:** Sin LLM en esta decisión concreta; la tomé al modelar las tablas.
+**Uso de LLM:** Le pedí la configuración de los tests (`conftest.py`).
 
-**Salida del modelo:** Sin LLM.
+**Salida del modelo:** El primer intento recargaba módulos por dentro para cambiar
+la base de datos. Al ejecutarlo **falló** con un error de "tabla ya definida".
 
-**Mi decisión:** Almaceno los enums como `String(20)` y valido los valores en la
-capa de aplicación con los `Enum` de Python (`app/enums.py`) y con Pydantic. El
-criterio: el tipo `ENUM` nativo de PostgreSQL es incómodo de evolucionar (añadir
-un estado exige `ALTER TYPE ... ADD VALUE`, que tiene restricciones dentro de
-transacciones) y no es portable a SQLite, que uso en los tests. La validación real
-la garantizan Pydantic (entrada) y la máquina de estados (transiciones), no la
-columna. Trade-off aceptado: la base de datos por sí sola no impide un valor
-fuera del conjunto; confío esa garantía a la capa de aplicación, que además ya
-la necesita para la lógica de transiciones.
+**Mi decisión:** Descarté ese primer enfoque (frágil) y usé la forma recomendada de
+FastAPI: sustituir la dependencia de la base de datos por una SQLite en memoria solo
+para los tests. Reconozco que la primera versión estaba mal; lo detecté al ejecutar
+los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
+
+---
+
+### Estados y prioridades guardados como texto
+
+**Contexto:** `estado` y `prioridad` solo pueden tomar unos pocos valores fijos.
+PostgreSQL tiene un tipo especial para esto (`ENUM`).
+
+**Uso de LLM:** Sin LLM; lo decidí al modelar las tablas.
+
+**Salida del modelo:** Sin LLM en esta decisión.
+
+**Mi decisión:** Los guardo como texto y valido los valores en la aplicación (con
+los enumerados de Python y con Pydantic). El tipo `ENUM` de PostgreSQL es incómodo
+de cambiar (añadir un estado nuevo es molesto) y no funciona en SQLite, que uso en
+los tests. La validación real ya la hacen la aplicación y la máquina de estados, así
+que no la necesito también en la columna.
+
+---
+
+### Configuración por `.env` y archivo `.env.example`
+
+**Contexto:** El secreto que usa el webhook para verificar la firma tenía en el
+código un valor por defecto (`change-me`). Ese campo ya se leía desde una variable
+de entorno, pero no había un archivo que dejara claras todas las variables de
+configuración del proyecto ni cómo rellenarlas.
+
+**Uso de LLM:** Ninguno para tomar la decisión; me pediste centralizar la
+configuración en `.env` y yo preparé el archivo de ejemplo.
+
+**Salida del modelo:** Sin propuesta del modelo; fue una petición tuya.
+
+**Mi decisión:** A tu petición, dejé claro que la configuración viene de un archivo
+`.env` y añadí un **`.env.example`** en la raíz con todos los valores: la conexión
+a la base de datos, el secreto del webhook (como marcador `change-me`, con aviso de
+cambiarlo), la URL de Redis, los orígenes permitidos (CORS), el interruptor de
+datos de ejemplo y las URLs del frontend. El `.env` real **no se sube** al
+repositorio (está ignorado en git); solo se versiona el `.env.example`. Así no hay
+ningún secreto en el repositorio y cualquiera puede arrancar el proyecto copiando
+el ejemplo (`cp .env.example .env`) y ajustando los valores.

@@ -25,7 +25,9 @@ datos, contratos de API y decisiones de implementación.
 - **Backend**: FastAPI (async), SQLAlchemy 2.0 async, Alembic, Pydantic v2.
 - **Frontend**: Next.js 14 App Router, TypeScript, Tailwind.
 - **DB**: PostgreSQL 16.
-- **Orquestación**: Docker Compose (api + web + db).
+- **Tiempo real**: Redis (pub/sub) para difundir eventos WebSocket entre
+  instancias.
+- **Orquestación**: Docker Compose (api + web + db + redis).
 
 ## 2. Decisión de base de datos: PostgreSQL
 
@@ -33,8 +35,8 @@ Se elige PostgreSQL sobre MongoDB por:
 
 - El dominio es **relacional**: un ticket tiene muchos comentarios; interesa
   integridad referencial (FK con `ON DELETE CASCADE`).
-- La **idempotencia del webhook** (bonus) se implementa de forma trivial y segura
-  con una constraint `UNIQUE (event_id)`, delegando la garantía a la DB.
+- La **idempotencia del webhook** se implementa de forma sencilla y segura con
+  una constraint `UNIQUE (event_id)`, delegando la garantía a la DB.
 - Los **filtros y paginación** del listado se benefician de índices B-tree sobre
   `estado` y `prioridad`.
 - Las transiciones de estado se benefician de transacciones ACID.
@@ -56,33 +58,33 @@ necesitamos y complicaría el hilo de comentarios y la unicidad del `event_id`.
 
 | Columna         | Tipo                    | Notas                              |
 |-----------------|-------------------------|------------------------------------|
-| id              | UUID (PK)               | generado por servidor              |
+| id              | INTEGER (PK)            | autoincremental                    |
 | titulo          | VARCHAR(200) NOT NULL   |                                    |
 | descripcion     | TEXT NOT NULL           |                                    |
-| prioridad       | ENUM(prioridad)         | baja, media, alta, urgente         |
-| estado          | ENUM(estado)            | abierto, en_progreso, resuelto, cerrado |
+| prioridad       | VARCHAR(20)             | baja, media, alta, urgente (validado en app) |
+| estado          | VARCHAR(20)             | abierto, en_progreso, resuelto, cerrado (validado en app) |
 | asignado_a      | VARCHAR(120) NULL       | nombre/email del agente            |
 | creado_en       | TIMESTAMPTZ NOT NULL    | default now()                      |
 | actualizado_en  | TIMESTAMPTZ NOT NULL    | se refresca en cada update         |
 
 ### Tabla `comments`
 
-| Columna     | Tipo                  | Notas                        |
-|-------------|-----------------------|------------------------------|
-| id          | UUID (PK)             |                              |
-| ticket_id   | UUID FK → tickets.id  | ON DELETE CASCADE, indexado  |
-| autor       | VARCHAR(120) NOT NULL |                              |
-| cuerpo      | TEXT NOT NULL         |                              |
-| creado_en   | TIMESTAMPTZ NOT NULL  | default now()                |
+| Columna     | Tipo                     | Notas                        |
+|-------------|--------------------------|------------------------------|
+| id          | INTEGER (PK)             | autoincremental              |
+| ticket_id   | INTEGER FK → tickets.id  | ON DELETE CASCADE, indexado  |
+| autor       | VARCHAR(120) NOT NULL    |                              |
+| cuerpo      | TEXT NOT NULL            |                              |
+| creado_en   | TIMESTAMPTZ NOT NULL     | default now()                |
 
-### Tabla `webhook_events` (idempotencia — bonus)
+### Tabla `webhook_events` (idempotencia)
 
-| Columna       | Tipo                 | Notas                         |
-|---------------|----------------------|-------------------------------|
-| id            | UUID (PK)            |                               |
-| event_id      | VARCHAR(120) UNIQUE  | id del evento externo         |
-| ticket_id     | UUID FK → tickets.id |                               |
-| procesado_en  | TIMESTAMPTZ          | default now()                 |
+| Columna       | Tipo                    | Notas                         |
+|---------------|-------------------------|-------------------------------|
+| id            | INTEGER (PK)            | autoincremental               |
+| event_id      | VARCHAR(120) UNIQUE     | id del evento externo         |
+| ticket_id     | INTEGER FK → tickets.id | |
+| procesado_en  | TIMESTAMPTZ            | default now()                 |
 
 ## 4. Máquina de estados
 
@@ -140,10 +142,12 @@ Orden importante: **primero firma (401), luego forma (422)**.
 
 ## 7. WebSocket — ConnectionManager
 
-- `ConnectionManager` mantiene una lista de `WebSocket` activos.
+- `ConnectionManager` mantiene una lista de `WebSocket` activos por proceso.
 - `connect` acepta y registra; `disconnect` elimina del registro.
-- `broadcast(event)` itera y envía JSON; si un envío falla, marca esa conexión
-  para eliminación (desconexión limpia, sin errores silenciosos).
+- `broadcast(tipo, datos)` publica el evento en un canal de Redis; un subscriptor
+  de fondo en cada instancia relaya el mensaje a sus conexiones locales. Si un
+  envío a un cliente falla, se marca esa conexión para eliminación (desconexión
+  limpia, sin errores silenciosos).
 - Los endpoints REST que mutan estado (crear/actualizar/transicionar/comentar)
   publican el evento correspondiente tras confirmar en DB.
 
@@ -153,8 +157,10 @@ Formato de evento:
 { "tipo": "ticket.actualizado", "datos": { ...TicketOut } }
 ```
 
-Limitación conocida: el manager vive en memoria del proceso. Con múltiples
-workers habría que usar Redis pub/sub. Se documenta como fuera de alcance.
+Escalado: los eventos viajan por Redis pub/sub (canal `deskly:events`), de modo
+que funcionan con múltiples instancias/workers del backend. Si Redis no está
+disponible (p. ej. en tests o arranque local sin broker), el manager difunde solo
+a las conexiones locales del proceso (modo de respaldo tolerante a fallos).
 
 ## 8. Frontend
 
@@ -172,18 +178,20 @@ workers habría que usar Redis pub/sub. Se documenta como fuera de alcance.
 ```
 api/
   app/
-    main.py            # app FastAPI, routers, exception handlers
+    main.py            # app FastAPI, routers, exception handlers, lifespan
     config.py          # settings Pydantic
     db.py              # engine async, session
     models.py          # SQLAlchemy
     schemas.py         # Pydantic v2
+    enums.py           # Estado, Prioridad
     state_machine.py   # transiciones + errores
-    ws.py              # ConnectionManager
+    ws.py              # ConnectionManager + Redis pub/sub
+    events.py          # constantes de tipos de evento
+    bootstrap.py       # seed de datos de ejemplo
     routers/
       tickets.py
       webhooks.py
       websocket.py
-    seed.py
   alembic/             # migraciones
   tests/
 web/
