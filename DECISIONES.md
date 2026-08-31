@@ -292,3 +292,53 @@ contexto de autenticación (`AuthProvider`) mantiene el usuario actual, y un gua
 (`RequireAuth`) redirige a `/login` si no hay sesión y bloquea `/users` a los no
 administradores. Es una protección de conveniencia en el cliente; la seguridad
 real la impone el backend, que valida el JWT en cada endpoint.
+
+---
+
+### [Decisión] Transición inválida: corregir un 500 a 409 (bug encontrado en auditoría)
+
+**Contexto:** El enunciado exige que una transición de estado inválida devuelva un
+error claro, **no un 500 genérico**. Los tests unitarios de la máquina de estados
+pasaban, pero al probar el flujo completo en Docker la petición HTTP devolvía
+**500**.
+
+**Uso de LLM:** Le pedí que diagnosticara por qué el endpoint devolvía 500 en vez
+de 409.
+
+**Salida del modelo:** Encontró la causa raíz: el estado del ticket se guarda como
+**texto** en la base de datos, así que un ticket leído de la DB trae `estado` como
+un `str`, no como el enum `Estado`. Al construir el error, el código hacía
+`.value` sobre ese texto y lanzaba `AttributeError` **antes** de que el manejador
+pudiera convertirlo en 409, produciendo un 500.
+
+**Mi decisión:** Acepté el diagnóstico y lo corregí en la raíz: la máquina de
+estados ahora **normaliza** las entradas a `Estado`, así funciona tanto si recibe
+el enum como el texto de la DB. Añadí **tests de regresión** para que no vuelva a
+pasar: uno a nivel de función (con entradas de texto) y otro a nivel HTTP que
+comprueba que la transición inválida devuelve **409**. El fallo lo detecté yo al
+auditar el arranque real (los tests unitarios no lo cubrían porque usaban el enum
+directamente); lo dejo documentado con honestidad porque muestra por qué conviene
+probar el camino completo, no solo las funciones aisladas.
+
+---
+
+### [Decisión] Pipeline de CI (GitHub Actions) con lint y tests
+
+**Contexto:** Es un bonus del enunciado. Quería una red de seguridad que revise el
+código en cada cambio.
+
+**Uso de LLM:** Le pedí un workflow con lint y tests para backend y frontend.
+
+**Salida del modelo:** Propuso dos trabajos: backend (lint + tests con Python) y
+frontend (lint + build con Node).
+
+**Mi decisión:** Lo acepté y lo dejé afinado para que salga en verde de verdad,
+verificándolo localmente antes de subirlo. En el backend uso **ruff** para el lint
+y **pytest** para los tests; configuré ruff con reglas de problemas reales en vez
+de activar todas las reglas opinionadas (por ejemplo, permito los `except`
+genéricos del gestor de WebSocket, que son intencionales para la desconexión
+limpia). En el frontend uso **ESLint** (`next lint`) y `next build`, que además
+comprueba los tipos. Verifiqué los cuatro pasos en local (23 tests, lint limpio en
+ambos, build correcto). Nota honesta: el workflow no se ha ejecutado aún en
+GitHub Actions real porque no hay repositorio remoto en este entorno, pero cada
+paso usa los mismos comandos que probé.
