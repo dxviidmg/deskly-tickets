@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.enums import Estado, Prioridad
 
@@ -15,7 +15,8 @@ class TicketCreate(BaseModel):
     titulo: str = Field(min_length=1, max_length=200)
     descripcion: str = Field(min_length=1)
     prioridad: Prioridad = Prioridad.media
-    asignado_a: str | None = Field(default=None, max_length=120)
+    # Id of the user the ticket is assigned to (optional).
+    asignado_a_id: int | None = None
 
 
 class TicketUpdate(BaseModel):
@@ -24,7 +25,7 @@ class TicketUpdate(BaseModel):
     titulo: str | None = Field(default=None, min_length=1, max_length=200)
     descripcion: str | None = Field(default=None, min_length=1)
     prioridad: Prioridad | None = None
-    asignado_a: str | None = Field(default=None, max_length=120)
+    asignado_a_id: int | None = None
 
 
 class TransitionIn(BaseModel):
@@ -39,7 +40,8 @@ class TicketOut(BaseModel):
     descripcion: str
     prioridad: Prioridad
     estado: Estado
-    asignado_a: str | None
+    asignado_a_id: int | None
+    asignado_a: str | None  # assigned user's email (read-only, from relationship)
     creado_en: datetime
     actualizado_en: datetime
 
@@ -47,7 +49,6 @@ class TicketOut(BaseModel):
 # --- Comments ------------------------------------------------------------
 
 class CommentCreate(BaseModel):
-    autor: str = Field(min_length=1, max_length=120)
     cuerpo: str = Field(min_length=1)
 
 
@@ -83,4 +84,37 @@ class WebhookTicketIn(BaseModel):
     titulo: str = Field(min_length=1, max_length=200)
     descripcion: str = Field(min_length=1)
     prioridad: Prioridad = Prioridad.media
-    asignado_a: str | None = Field(default=None, max_length=120)
+    asignado_a_id: int | None = None
+
+
+# --- Auth & Users --------------------------------------------------------
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1)
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=128)
+    is_admin: bool = False
+
+
+class UserUpdate(BaseModel):
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=6, max_length=128)
+    is_admin: bool | None = None
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: EmailStr
+    is_admin: bool
+    creado_en: datetime

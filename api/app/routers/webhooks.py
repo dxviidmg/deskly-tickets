@@ -78,19 +78,21 @@ async def ingest_ticket(
     )
     if existing is not None:
         ticket = await session.get(Ticket, existing.ticket_id)
+        await session.refresh(ticket, attribute_names=["asignado"])
         return TicketOut.model_validate(ticket)
 
     ticket = Ticket(
         titulo=data.titulo,
         descripcion=data.descripcion,
         prioridad=data.prioridad,
-        asignado_a=data.asignado_a,
+        asignado_a_id=data.asignado_a_id,
     )
     session.add(ticket)
     await session.flush()
     session.add(WebhookEvent(event_id=data.event_id, ticket_id=ticket.id))
     await session.commit()
-    await session.refresh(ticket)
+    await session.refresh(ticket, attribute_names=["asignado"])
 
-    await manager.broadcast(TICKET_CREATED, TicketOut.model_validate(ticket))
-    return TicketOut.model_validate(ticket)
+    out = TicketOut.model_validate(ticket)
+    await manager.broadcast(TICKET_CREATED, out)
+    return out

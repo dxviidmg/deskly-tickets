@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.bootstrap import seed
 from app.config import get_settings
-from app.routers import tickets, webhooks, websocket
+from app.routers import auth, tickets, users, webhooks, websocket
 from app.state_machine import InvalidTransitionError
 from app.ws import manager
 
@@ -64,6 +64,8 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+app.include_router(auth.router)
+app.include_router(users.router)
 app.include_router(tickets.router)
 app.include_router(webhooks.router)
 app.include_router(websocket.router)
