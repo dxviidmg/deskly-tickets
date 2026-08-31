@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import "./globals.css";
+import { AuthProvider } from "@/components/AuthProvider";
+import { NavBar } from "@/components/NavBar";
 
 export const metadata: Metadata = {
   title: "Deskly — Tickets de soporte",
@@ -15,17 +16,10 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body>
-        <header className="border-b bg-white">
-          <div className="mx-auto max-w-5xl px-4 py-4">
-            <Link href="/" className="text-xl font-semibold">
-              Deskly
-            </Link>
-            <span className="ml-2 text-sm text-slate-500">
-              Tickets de soporte
-            </span>
-          </div>
-        </header>
-        <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+        <AuthProvider>
+          <NavBar />
+          <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -9,9 +9,23 @@ export interface Ticket {
   descripcion: string;
   prioridad: Prioridad;
   estado: Estado;
-  asignado_a: string | null;
+  asignado_a_id: number | null;
+  asignado_a: string | null; // assigned user's email (read-only)
   creado_en: string;
   actualizado_en: string;
+}
+
+export interface User {
+  id: number;
+  email: string;
+  is_admin: boolean;
+  creado_en: string;
+}
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  is_admin: boolean;
 }
 
 export interface Comment {
