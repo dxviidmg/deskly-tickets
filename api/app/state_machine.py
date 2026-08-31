@@ -20,6 +20,8 @@ class InvalidTransitionError(Exception):
     """Raised when a state transition is not allowed."""
 
     def __init__(self, current: Estado, requested: Estado) -> None:
+        current = Estado(current)
+        requested = Estado(requested)
         self.current = current
         self.requested = requested
         self.allowed = sorted(
@@ -31,7 +33,13 @@ class InvalidTransitionError(Exception):
 
 
 def can_transition(current: Estado, requested: Estado) -> bool:
-    """Return True if moving from ``current`` to ``requested`` is allowed."""
+    """Return True if moving from ``current`` to ``requested`` is allowed.
+
+    Accepts either ``Estado`` values or their string equivalents (columns are
+    stored as text, so a ticket loaded from the DB carries a plain string).
+    """
+    current = Estado(current)
+    requested = Estado(requested)
     return requested in ALLOWED_TRANSITIONS.get(current, set())
 
 

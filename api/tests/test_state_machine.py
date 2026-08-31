@@ -41,3 +41,15 @@ def test_invalid_transitions(current, requested):
     assert err.current == current
     assert err.requested == requested
     assert isinstance(err.allowed, list)
+
+
+def test_accepts_string_inputs_like_the_database():
+    # Tickets loaded from the DB carry the estado as a plain string, not the
+    # Estado enum. The state machine must handle that without raising
+    # AttributeError (regression: previously produced a 500 instead of 409).
+    assert can_transition("abierto", "en_progreso") is True
+    assert can_transition("abierto", "cerrado") is False
+    with pytest.raises(InvalidTransitionError) as exc_info:
+        assert_transition("abierto", "cerrado")
+    assert exc_info.value.current == Estado.abierto
+    assert exc_info.value.requested == Estado.cerrado

@@ -74,3 +74,22 @@ async def test_ticket_assignee_must_exist(admin_client):
         },
     )
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_invalid_transition_returns_409_over_http(admin_client):
+    # Create a ticket (starts as "abierto") and attempt an invalid transition.
+    # This exercises the full HTTP path: the estado comes back from the DB as a
+    # string, so this guards against the 500 regression.
+    created = await admin_client.post(
+        "/api/tickets",
+        json={"titulo": "T", "descripcion": "d", "prioridad": "media"},
+    )
+    tid = created.json()["id"]
+    resp = await admin_client.post(
+        f"/api/tickets/{tid}/transicion", json={"nuevo_estado": "cerrado"}
+    )
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert detail["actual"] == "abierto"
+    assert detail["solicitado"] == "cerrado"
