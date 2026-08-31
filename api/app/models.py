@@ -2,6 +2,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -16,6 +17,19 @@ from app.db import Base
 from app.enums import Estado, Prioridad
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    # Whether the user can manage (CRUD) other users.
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class Ticket(Base):
     __tablename__ = "tickets"
 
@@ -28,7 +42,10 @@ class Ticket(Base):
     estado: Mapped[Estado] = mapped_column(
         String(20), nullable=False, default=Estado.abierto
     )
-    asignado_a: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # The agent (user) the ticket is assigned to. Null = unassigned.
+    asignado_a_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -38,6 +55,8 @@ class Ticket(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    asignado: Mapped["User | None"] = relationship("User", lazy="joined")
 
     comments: Mapped[list["Comment"]] = relationship(
         back_populates="ticket",
@@ -50,6 +69,11 @@ class Ticket(Base):
         Index("ix_tickets_estado", "estado"),
         Index("ix_tickets_prioridad", "prioridad"),
     )
+
+    @property
+    def asignado_a(self) -> str | None:
+        """Convenience: assigned user's email (for API responses)."""
+        return self.asignado.email if self.asignado else None
 
 
 class Comment(Base):

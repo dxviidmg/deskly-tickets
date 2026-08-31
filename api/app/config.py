@@ -27,6 +27,16 @@ class Settings(BaseSettings):
     # CORS: comma-separated list of allowed origins for the frontend.
     cors_origins: str = "http://localhost:3000"
 
+    # --- Auth (JWT) ---
+    # Secret used to sign JWT access tokens. Override in production via env.
+    jwt_secret: str = "change-me-too"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
+
+    # Initial admin user created by the seed (if it does not exist yet).
+    admin_email: str = "admin@deskly.com"
+    admin_password: str = "admin123"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
