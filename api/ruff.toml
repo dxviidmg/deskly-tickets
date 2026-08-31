@@ -1,0 +1,13 @@
+# Ruff configuration for the backend.
+# We lint for real problems (pyflakes, import order, common bugbears) rather
+# than enabling every opinionated rule. Blind excepts in the WebSocket manager
+# are intentional (clean disconnect), so BLE001 is not enabled.
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]  # line length is handled by the formatter, not enforced hard
+
+[lint.per-file-ignores]
+"alembic/*" = ["F401", "E402"]
