@@ -12,7 +12,7 @@ son ejecuciones reales de esta sesión, no suposiciones.
 
 ---
 
-### Base de datos: PostgreSQL en lugar de MongoDB
+### [Decisión] Base de datos: PostgreSQL en lugar de MongoDB
 
 **Contexto:** El reto me deja elegir entre PostgreSQL o MongoDB. Los datos son
 tickets con comentarios, con filtros y paginación.
@@ -34,7 +34,7 @@ ticket siempre tiene los mismos campos.
 
 ---
 
-### Migraciones con Alembic (el modelo dijo que no hacía falta; yo lo pedí)
+### [Decisión] Migraciones con Alembic (el modelo dijo que no hacía falta; yo lo pedí)
 
 **Contexto:** Hay que crear las tablas al levantar el backend. Se puede hacer
 automáticamente al arrancar, o con Alembic, que es la herramienta estándar de
@@ -56,7 +56,7 @@ arrancar la app.
 
 ---
 
-### IDs numéricos autoincrementales (el modelo usó UUID; yo lo pedí cambiar)
+### [Decisión] IDs numéricos autoincrementales (el modelo usó UUID; yo lo pedí cambiar)
 
 **Contexto:** Cada tabla necesita un identificador. Puede ser un número que crece
 solo (1, 2, 3…) o un UUID (un código largo como `550e8400-e29b-...`).
@@ -80,7 +80,7 @@ ocultar esa información, volvería a UUID.
 
 ---
 
-### Webhook: primero la firma (401), luego el contenido (422)
+### [Decisión] Webhook: primero la firma (401), luego el contenido (422)
 
 **Contexto:** El webhook debe responder 401 si la firma es inválida y 422 si el
 contenido está mal. Como una misma petición puede fallar en las dos cosas, el orden
@@ -98,7 +98,7 @@ hace de forma segura para no filtrar información.
 
 ---
 
-### Tiempo real con Redis (el modelo lo hizo en memoria; yo pedí Redis)
+### [Decisión] Tiempo real con Redis (el modelo lo hizo en memoria; yo pedí Redis)
 
 **Contexto:** Cuando se crea, actualiza o comenta un ticket, hay que avisar en el
 momento a los agentes conectados por WebSocket. Cada instancia del backend guarda
@@ -124,7 +124,7 @@ un aviso publicado llega al cliente; y que los 14 tests pasan sin Redis.
 
 ---
 
-### Entorno de desarrollo: Python 3.12 con `uv` (mi máquina trae 3.14)
+### [Decisión] Entorno de desarrollo: Python 3.12 con `uv` (mi máquina trae 3.14)
 
 **Contexto:** Mi máquina tiene Python 3.14 por defecto. Al instalar las
 dependencias fallaban dos de ellas porque todavía no son compatibles con 3.14.
@@ -143,7 +143,7 @@ que verifico en local coincide con lo que correrá en el contenedor.
 
 ---
 
-### Tests: cómo conecto la app a una base de datos de prueba
+### [Decisión] Tests: cómo conecto la app a una base de datos de prueba
 
 **Contexto:** Los tests del webhook necesitan que la app use una base de datos de
 prueba (SQLite) en vez de PostgreSQL.
@@ -160,7 +160,7 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 
 ---
 
-### Estados y prioridades guardados como texto
+### [Decisión] Estados y prioridades guardados como texto
 
 **Contexto:** `estado` y `prioridad` solo pueden tomar unos pocos valores fijos. PostgreSQL tiene un tipo especial para esto (`ENUM`).
 
@@ -172,7 +172,7 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 
 ---
 
-### Configuración por `.env` y archivo `.env.example`
+### [Decisión] Configuración por `.env` y archivo `.env.example`
 
 **Contexto:** El secreto que usa el webhook para verificar la firma tenía en el código un valor por defecto (`change-me`). Ese campo ya se leía desde una variable de entorno, pero no había un archivo que dejara claras todas las variables de configuración del proyecto ni cómo rellenarlas.
 
@@ -184,7 +184,7 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 
 ---
 
-### Frontend sin librería de estado (React Query u otras)
+### [Decisión] Frontend sin librería de estado (React Query u otras)
 
 **Contexto:** El frontend tiene que listar tickets, filtrarlos, ver el detalle y actualizarse en vivo. Una opción habitual es añadir una librería de datos como React Query.
 
@@ -196,7 +196,7 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 
 ---
 
-### SSR solo en el detalle; dashboard interactivo en el cliente
+### [Decisión] SSR solo en el detalle; dashboard interactivo en el cliente
 
 **Contexto:** El reto pide que el **detalle** `/tickets/[id]` sea renderizado en el servidor (SSR). El dashboard, en cambio, necesita filtro y actualización en vivo.
 
@@ -208,7 +208,7 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 
 ---
 
-### Reconexión automática del WebSocket
+### [Decisión] Reconexión automática del WebSocket
 
 **Contexto:** La conexión de tiempo real puede caerse (red, reinicio del backend). Si no se hace nada, el usuario deja de recibir avisos sin enterarse.
 
@@ -221,7 +221,7 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 
 ---
 
-### Usuarios, autenticación e `is_admin` (ampliación del alcance)
+### [Decisión] Usuarios, autenticación e `is_admin` (ampliación del alcance)
 
 **Contexto:** El campo obligatorio `asignado_a` sugiere que un humano atiende el
 ticket. El enunciado no pide usuarios ni login, pero decidí que en un producto
@@ -253,7 +253,7 @@ Asumo el trade-off: es bastante más trabajo y amplía el alcance. Lo prioricé
 
 ---
 
-### Detalle técnico: bcrypt fijado a 4.0.1 por compatibilidad con passlib
+### [Decisión] Detalle técnico: bcrypt fijado a 4.0.1 por compatibilidad con passlib
 
 **Contexto:** Al hashear contraseñas con `passlib`, los tests fallaban con errores
 extraños de bcrypt ("password cannot be longer than 72 bytes" y un fallo al leer
@@ -273,7 +273,7 @@ clavada.
 
 ---
 
-### Frontend: token en cookie para que el SSR también esté autenticado
+### [Decisión] Frontend: token en cookie para que el SSR también esté autenticado
 
 **Contexto:** Con la API protegida por JWT, el frontend necesita enviar el token
 en cada petición. El detalle `/tickets/[id]` se renderiza en el servidor (SSR),
