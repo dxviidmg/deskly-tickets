@@ -162,96 +162,111 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 
 ### Estados y prioridades guardados como texto
 
-**Contexto:** `estado` y `prioridad` solo pueden tomar unos pocos valores fijos.
-PostgreSQL tiene un tipo especial para esto (`ENUM`).
+**Contexto:** `estado` y `prioridad` solo pueden tomar unos pocos valores fijos. PostgreSQL tiene un tipo especial para esto (`ENUM`).
 
 **Uso de LLM:** Sin LLM; lo decidí al modelar las tablas.
 
 **Salida del modelo:** Sin LLM en esta decisión.
 
-**Mi decisión:** Los guardo como texto y valido los valores en la aplicación (con
-los enumerados de Python y con Pydantic). El tipo `ENUM` de PostgreSQL es incómodo
-de cambiar (añadir un estado nuevo es molesto) y no funciona en SQLite, que uso en
-los tests. La validación real ya la hacen la aplicación y la máquina de estados, así
-que no la necesito también en la columna.
+**Mi decisión:** Los guardo como texto y valido los valores en la aplicación (con los enumerados de Python y con Pydantic). El tipo `ENUM` de PostgreSQL es incómodo de cambiar (añadir un estado nuevo es molesto) y no funciona en SQLite, que uso en los tests. La validación real ya la hacen la aplicación y la máquina de estados, así que no la necesito también en la columna.
 
 ---
 
 ### Configuración por `.env` y archivo `.env.example`
 
-**Contexto:** El secreto que usa el webhook para verificar la firma tenía en el
-código un valor por defecto (`change-me`). Ese campo ya se leía desde una variable
-de entorno, pero no había un archivo que dejara claras todas las variables de
-configuración del proyecto ni cómo rellenarlas.
+**Contexto:** El secreto que usa el webhook para verificar la firma tenía en el código un valor por defecto (`change-me`). Ese campo ya se leía desde una variable de entorno, pero no había un archivo que dejara claras todas las variables de configuración del proyecto ni cómo rellenarlas.
 
-**Uso de LLM:** Ninguno para tomar la decisión; me pediste centralizar la
-configuración en `.env` y yo preparé el archivo de ejemplo.
+**Uso de LLM:** Ninguno para tomar la decisión; me pediste centralizar la configuración en `.env` y yo preparé el archivo de ejemplo.
 
 **Salida del modelo:** Sin propuesta del modelo; fue una petición tuya.
 
-**Mi decisión:** A tu petición, dejé claro que la configuración viene de un archivo
-`.env` y añadí un **`.env.example`** en la raíz con todos los valores: la conexión
-a la base de datos, el secreto del webhook (como marcador `change-me`, con aviso de
-cambiarlo), la URL de Redis, los orígenes permitidos (CORS), el interruptor de
-datos de ejemplo y las URLs del frontend. El `.env` real **no se sube** al
-repositorio (está ignorado en git); solo se versiona el `.env.example`. Así no hay
-ningún secreto en el repositorio y cualquiera puede arrancar el proyecto copiando
-el ejemplo (`cp .env.example .env`) y ajustando los valores.
+**Mi decisión:** A tu petición, dejé claro que la configuración viene de un archivo `.env` y añadí un **`.env.example`** en la raíz con todos los valores: la conexión a la base de datos, el secreto del webhook (como marcador `change-me`, con aviso de cambiarlo), la URL de Redis, los orígenes permitidos (CORS), el interruptor de datos de ejemplo y las URLs del frontend. El `.env` real **no se sube** al repositorio (está ignorado en git); solo se versiona el `.env.example`. Así no hay ningún secreto en el repositorio y cualquiera puede arrancar el proyecto copiando el ejemplo (`cp .env.example .env`) y ajustando los valores.
 
 ---
 
 ### Frontend sin librería de estado (React Query u otras)
 
-**Contexto:** El frontend tiene que listar tickets, filtrarlos, ver el detalle y
-actualizarse en vivo. Una opción habitual es añadir una librería de datos como
-React Query.
+**Contexto:** El frontend tiene que listar tickets, filtrarlos, ver el detalle y actualizarse en vivo. Una opción habitual es añadir una librería de datos como React Query.
 
 **Uso de LLM:** Le pedí el frontend con Next.js 14.
 
-**Salida del modelo:** Propuso resolverlo con las herramientas propias de Next y
-React (componentes de servidor para la carga inicial y `fetch`), sin añadir
-librerías extra.
+**Salida del modelo:** Propuso resolverlo con las herramientas propias de Next y React (componentes de servidor para la carga inicial y `fetch`), sin añadir librerías extra.
 
-**Mi decisión:** Acepté no meter React Query ni un store global. Para este alcance,
-los componentes de servidor de Next (para la carga inicial) y `useState`/`useEffect`
-(para la interacción y el tiempo real) son suficientes. Menos dependencias, menos
-cosas que explicar y defender. Si la app creciera (mucha caché, sincronización
-compleja), reconsideraría una librería de datos.
+**Mi decisión:** Acepté no meter React Query ni un store global. Para este alcance, los componentes de servidor de Next (para la carga inicial) y `useState`/`useEffect` (para la interacción y el tiempo real) son suficientes. Menos dependencias, menos cosas que explicar y defender. Si la app creciera (mucha caché, sincronización compleja), reconsideraría una librería de datos.
 
 ---
 
 ### SSR solo en el detalle; dashboard interactivo en el cliente
 
-**Contexto:** El reto pide que el **detalle** `/tickets/[id]` sea renderizado en el
-servidor (SSR). El dashboard, en cambio, necesita filtro y actualización en vivo.
+**Contexto:** El reto pide que el **detalle** `/tickets/[id]` sea renderizado en el servidor (SSR). El dashboard, en cambio, necesita filtro y actualización en vivo.
 
 **Uso de LLM:** Le pedí las dos páginas.
 
-**Salida del modelo:** Planteó el detalle como componente de servidor (SSR) y el
-dashboard con interacción en el cliente.
+**Salida del modelo:** Planteó el detalle como componente de servidor (SSR) y el dashboard con interacción en el cliente.
 
-**Mi decisión:** El detalle se renderiza en el servidor: la primera carga ya trae
-el ticket y sus comentarios (mejor para SSR y para enlaces directos). La
-interacción del detalle (cambiar estado, comentar, tiempo real) va en un componente
-de cliente aparte. El dashboard lo hice de cliente porque combina filtro,
-paginación y actualización en vivo, que son inherentemente interactivos. Así cada
-página usa el enfoque que mejor le encaja.
+**Mi decisión:** El detalle se renderiza en el servidor: la primera carga ya trae el ticket y sus comentarios (mejor para SSR y para enlaces directos). La interacción del detalle (cambiar estado, comentar, tiempo real) va en un componente de cliente aparte. El dashboard lo hice de cliente porque combina filtro, paginación y actualización en vivo, que son inherentemente interactivos. Así cada página usa el enfoque que mejor le encaja.
 
 ---
 
 ### Reconexión automática del WebSocket
 
-**Contexto:** La conexión de tiempo real puede caerse (red, reinicio del backend).
-Si no se hace nada, el usuario deja de recibir avisos sin enterarse.
+**Contexto:** La conexión de tiempo real puede caerse (red, reinicio del backend). Si no se hace nada, el usuario deja de recibir avisos sin enterarse.
 
 **Uso de LLM:** Le pedí el hook de WebSocket con limpieza correcta.
 
-**Salida del modelo:** Entregó un hook que abre la conexión, la limpia al
-desmontar y expone el estado de conexión.
+**Salida del modelo:** Entregó un hook que abre la conexión, la limpia al desmontar y expone el estado de conexión.
 
-**Mi decisión:** Además de la limpieza, añadí **reconexión automática** con una
-espera creciente (hasta 5 s) cuando la conexión se pierde, y un **indicador visible**
-(En vivo / Conectando / Desconectado) para que el usuario sepa el estado. Al
-recibir un evento, el dashboard recarga la lista y el detalle recarga ese ticket:
-es lo más simple y siempre muestra datos consistentes con el servidor (preferí
-esto antes que aplicar cambios parciales en el cliente, que es más frágil).
+**Mi decisión:** Además de la limpieza, añadí **reconexión automática** con una espera creciente (hasta 5 s) cuando la conexión se pierde, y un **indicador visible**
+(En vivo / Conectando / Desconectado) para que el usuario sepa el estado. Al recibir un evento, el dashboard recarga la lista y el detalle recarga ese ticket: es lo más simple y siempre muestra datos consistentes con el servidor (preferí esto antes que aplicar cambios parciales en el cliente, que es más frágil).
+
+---
+
+### Usuarios, autenticación e `is_admin` (ampliación del alcance)
+
+**Contexto:** El campo obligatorio `asignado_a` sugiere que un humano atiende el
+ticket. El enunciado no pide usuarios ni login, pero decidí que en un producto
+real (tipo Jira o Flokzu) "asignado a" es un usuario con credenciales y permisos.
+
+**Uso de LLM:** Le pedí que evaluara el impacto de añadir usuarios y autenticación,
+y luego que lo implementara.
+
+**Salida del modelo:** Advirtió que añadir usuarios + login + permisos es un
+subsistema completo (toca modelo, todos los endpoints, el frontend y los tests) y
+que, al ser alcance extra no pedido, sólo compensa si se puede defender bien. Fue
+mi decisión seguir adelante.
+
+**Mi decisión:** Añadí una tabla `users` con **email**, **contraseña hasheada** y un
+permiso **`is_admin`** (si puede administrar a otros usuarios). La contraseña se
+guarda con **bcrypt** (nunca en claro). El acceso se hace con **JWT**: al iniciar
+sesión se entrega un token que luego autoriza las peticiones. Con esto:
+
+- Los endpoints de tickets requieren estar autenticado.
+- El CRUD de usuarios (`/api/users`) solo lo puede usar un `is_admin`.
+- `asignado_a` pasó a ser una **referencia al id de un usuario** (antes era texto),
+  y el autor de un comentario es el usuario autenticado.
+- El **webhook sigue usando su firma HMAC** (no JWT), porque es una integración
+  máquina-a-máquina, no una persona.
+- El **usuario admin inicial se crea en el seed**, para poder entrar la primera vez.
+
+Asumo el trade-off: es bastante más trabajo y amplía el alcance. Lo prioricé
+**después** de tener el resto funcionando, para no arriesgar el arranque.
+
+---
+
+### Detalle técnico: bcrypt fijado a 4.0.1 por compatibilidad con passlib
+
+**Contexto:** Al hashear contraseñas con `passlib`, los tests fallaban con errores
+extraños de bcrypt ("password cannot be longer than 72 bytes" y un fallo al leer
+la versión de bcrypt).
+
+**Uso de LLM:** Le pedí que diagnosticara el fallo.
+
+**Salida del modelo:** Identificó que las versiones recientes de la librería
+`bcrypt` (≥ 4.1) rompen la compatibilidad con `passlib 1.7.4`, que es la última
+versión estable de passlib.
+
+**Mi decisión:** Fijé **`bcrypt==4.0.1`** en las dependencias, que es la versión
+compatible con passlib 1.7.4. Es un ajuste pequeño pero real; lo detecté al
+ejecutar los tests, y tras fijarlo la suite pasa completa (21 tests). Lo dejo
+documentado para que quien mantenga el proyecto sepa por qué esa versión está
+clavada.
