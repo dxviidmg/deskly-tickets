@@ -1,19 +1,29 @@
 """Pytest fixtures.
 
 State-machine tests are pure and need no database. The webhook/API tests run
-the FastAPI app against a temporary file-based SQLite database (the portable
-GUID type lets the PostgreSQL schema run on SQLite unchanged). Environment
-variables are set *before* importing the app so settings pick them up.
+the FastAPI app against an in-memory SQLite database wired via FastAPI's
+dependency override (the portable GUID type lets the PostgreSQL schema run on
+SQLite unchanged). A StaticPool keeps the single in-memory connection alive for
+the whole test.
 """
 import hashlib
 import hmac
 import os
-import tempfile
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.pool import StaticPool
 
 WEBHOOK_SECRET = "test-secret"
+
+# Ensure the app's HMAC secret matches the one tests sign with. Set before the
+# app (and its settings) are imported anywhere.
+os.environ["WEBHOOK_SECRET"] = WEBHOOK_SECRET
 
 
 def sign(secret: str, body: bytes) -> str:
@@ -22,47 +32,34 @@ def sign(secret: str, body: bytes) -> str:
 
 @pytest_asyncio.fixture
 async def client():
-    # Fresh temp DB file per test for isolation.
-    fd, path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-
-    os.environ["WEBHOOK_SECRET"] = WEBHOOK_SECRET
-    os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{path}"
-    os.environ["DESKLY_SEED"] = "false"
-
-    # Import after env is set; clear settings cache in case of prior import.
     from app.config import get_settings
 
     get_settings.cache_clear()
 
-    # Reload db and dependent modules so the engine uses the test DATABASE_URL.
-    import importlib
+    from app.db import Base, get_session
+    from app.main import app
 
-    from app import db as db_module
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    TestSession = async_sessionmaker(
+        bind=engine, class_=AsyncSession, expire_on_commit=False
+    )
 
-    importlib.reload(db_module)
-    from app import models as models_module
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-    importlib.reload(models_module)
-    from app import bootstrap as bootstrap_module
+    async def override_get_session():
+        async with TestSession() as session:
+            yield session
 
-    importlib.reload(bootstrap_module)
-    from app.routers import tickets as tickets_module
-    from app.routers import webhooks as webhooks_module
-
-    importlib.reload(tickets_module)
-    importlib.reload(webhooks_module)
-    from app import main as main_module
-
-    importlib.reload(main_module)
-
-    app = main_module.app
+    app.dependency_overrides[get_session] = override_get_session
 
     transport = ASGITransport(app=app)
-    # Using the app as a context manager triggers lifespan (creates tables).
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        async with app.router.lifespan_context(app):
-            yield ac
+        yield ac
 
-    db_module.engine.dispose()
-    os.unlink(path)
+    app.dependency_overrides.clear()
+    await engine.dispose()
