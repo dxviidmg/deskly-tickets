@@ -1,5 +1,4 @@
 """Pydantic v2 schemas for request/response validation."""
-import uuid
 from datetime import datetime
 from typing import Generic, TypeVar
 
@@ -35,7 +34,7 @@ class TransitionIn(BaseModel):
 class TicketOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: uuid.UUID
+    id: int
     titulo: str
     descripcion: str
     prioridad: Prioridad
@@ -55,8 +54,8 @@ class CommentCreate(BaseModel):
 class CommentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: uuid.UUID
-    ticket_id: uuid.UUID
+    id: int
+    ticket_id: int
     autor: str
     cuerpo: str
     creado_en: datetime

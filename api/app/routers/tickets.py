@@ -1,6 +1,4 @@
 """Ticket REST endpoints: CRUD, state transition and comments."""
-import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +24,7 @@ from app.ws import manager
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
 
 
-async def _get_ticket_or_404(session: AsyncSession, ticket_id: uuid.UUID) -> Ticket:
+async def _get_ticket_or_404(session: AsyncSession, ticket_id: int) -> Ticket:
     ticket = await session.get(Ticket, ticket_id)
     if ticket is None:
         raise HTTPException(
@@ -80,7 +78,7 @@ async def list_tickets(
 
 @router.get("/{ticket_id}", response_model=TicketDetail)
 async def get_ticket(
-    ticket_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    ticket_id: int, session: AsyncSession = Depends(get_session)
 ) -> Ticket:
     stmt = (
         select(Ticket)
@@ -97,7 +95,7 @@ async def get_ticket(
 
 @router.patch("/{ticket_id}", response_model=TicketOut)
 async def update_ticket(
-    ticket_id: uuid.UUID,
+    ticket_id: int,
     payload: TicketUpdate,
     session: AsyncSession = Depends(get_session),
 ) -> Ticket:
@@ -113,7 +111,7 @@ async def update_ticket(
 
 @router.post("/{ticket_id}/transicion", response_model=TicketOut)
 async def transition_ticket(
-    ticket_id: uuid.UUID,
+    ticket_id: int,
     payload: TransitionIn,
     session: AsyncSession = Depends(get_session),
 ) -> Ticket:
@@ -133,7 +131,7 @@ async def transition_ticket(
     status_code=status.HTTP_201_CREATED,
 )
 async def add_comment(
-    ticket_id: uuid.UUID,
+    ticket_id: int,
     payload: CommentCreate,
     session: AsyncSession = Depends(get_session),
 ) -> Comment:

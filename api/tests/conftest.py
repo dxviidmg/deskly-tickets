@@ -2,9 +2,9 @@
 
 State-machine tests are pure and need no database. The webhook/API tests run
 the FastAPI app against an in-memory SQLite database wired via FastAPI's
-dependency override (the portable GUID type lets the PostgreSQL schema run on
-SQLite unchanged). A StaticPool keeps the single in-memory connection alive for
-the whole test.
+dependency override (integer autoincrement keys run on SQLite unchanged, so no
+special column type is needed). A StaticPool keeps the single in-memory
+connection alive for the whole test.
 """
 import hashlib
 import hmac

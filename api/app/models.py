@@ -1,11 +1,11 @@
 """SQLAlchemy ORM models."""
-import uuid
 from datetime import datetime
 
 from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     func,
@@ -14,15 +14,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.enums import Estado, Prioridad
-from app.types import GUID
 
 
 class Ticket(Base):
     __tablename__ = "tickets"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID(), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     titulo: Mapped[str] = mapped_column(String(200), nullable=False)
     descripcion: Mapped[str] = mapped_column(Text, nullable=False)
     prioridad: Mapped[Prioridad] = mapped_column(
@@ -58,11 +55,9 @@ class Ticket(Base):
 class Comment(Base):
     __tablename__ = "comments"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID(), primary_key=True, default=uuid.uuid4
-    )
-    ticket_id: Mapped[uuid.UUID] = mapped_column(
-        GUID(),
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticket_id: Mapped[int] = mapped_column(
+        Integer,
         ForeignKey("tickets.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -77,18 +72,16 @@ class Comment(Base):
 
 
 class WebhookEvent(Base):
-    """Processed webhook events, used to enforce idempotency (bonus)."""
+    """Processed webhook events, used to enforce idempotency."""
 
     __tablename__ = "webhook_events"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        GUID(), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     event_id: Mapped[str] = mapped_column(
         String(120), nullable=False, unique=True
     )
-    ticket_id: Mapped[uuid.UUID] = mapped_column(
-        GUID(), ForeignKey("tickets.id", ondelete="CASCADE")
+    ticket_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickets.id", ondelete="CASCADE")
     )
     procesado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
