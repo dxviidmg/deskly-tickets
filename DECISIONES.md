@@ -197,3 +197,61 @@ datos de ejemplo y las URLs del frontend. El `.env` real **no se sube** al
 repositorio (está ignorado en git); solo se versiona el `.env.example`. Así no hay
 ningún secreto en el repositorio y cualquiera puede arrancar el proyecto copiando
 el ejemplo (`cp .env.example .env`) y ajustando los valores.
+
+---
+
+### Frontend sin librería de estado (React Query u otras)
+
+**Contexto:** El frontend tiene que listar tickets, filtrarlos, ver el detalle y
+actualizarse en vivo. Una opción habitual es añadir una librería de datos como
+React Query.
+
+**Uso de LLM:** Le pedí el frontend con Next.js 14.
+
+**Salida del modelo:** Propuso resolverlo con las herramientas propias de Next y
+React (componentes de servidor para la carga inicial y `fetch`), sin añadir
+librerías extra.
+
+**Mi decisión:** Acepté no meter React Query ni un store global. Para este alcance,
+los componentes de servidor de Next (para la carga inicial) y `useState`/`useEffect`
+(para la interacción y el tiempo real) son suficientes. Menos dependencias, menos
+cosas que explicar y defender. Si la app creciera (mucha caché, sincronización
+compleja), reconsideraría una librería de datos.
+
+---
+
+### SSR solo en el detalle; dashboard interactivo en el cliente
+
+**Contexto:** El reto pide que el **detalle** `/tickets/[id]` sea renderizado en el
+servidor (SSR). El dashboard, en cambio, necesita filtro y actualización en vivo.
+
+**Uso de LLM:** Le pedí las dos páginas.
+
+**Salida del modelo:** Planteó el detalle como componente de servidor (SSR) y el
+dashboard con interacción en el cliente.
+
+**Mi decisión:** El detalle se renderiza en el servidor: la primera carga ya trae
+el ticket y sus comentarios (mejor para SSR y para enlaces directos). La
+interacción del detalle (cambiar estado, comentar, tiempo real) va en un componente
+de cliente aparte. El dashboard lo hice de cliente porque combina filtro,
+paginación y actualización en vivo, que son inherentemente interactivos. Así cada
+página usa el enfoque que mejor le encaja.
+
+---
+
+### Reconexión automática del WebSocket
+
+**Contexto:** La conexión de tiempo real puede caerse (red, reinicio del backend).
+Si no se hace nada, el usuario deja de recibir avisos sin enterarse.
+
+**Uso de LLM:** Le pedí el hook de WebSocket con limpieza correcta.
+
+**Salida del modelo:** Entregó un hook que abre la conexión, la limpia al
+desmontar y expone el estado de conexión.
+
+**Mi decisión:** Además de la limpieza, añadí **reconexión automática** con una
+espera creciente (hasta 5 s) cuando la conexión se pierde, y un **indicador visible**
+(En vivo / Conectando / Desconectado) para que el usuario sepa el estado. Al
+recibir un evento, el dashboard recarga la lista y el detalle recarga ese ticket:
+es lo más simple y siempre muestra datos consistentes con el servidor (preferí
+esto antes que aplicar cambios parciales en el cliente, que es más frágil).
