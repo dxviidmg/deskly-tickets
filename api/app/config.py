@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://deskly:deskly@db:5432/deskly"
 
+    # Redis: used as a pub/sub bus so WebSocket events reach clients across
+    # multiple backend instances/workers. Optional in local/test runs.
+    redis_url: str = "redis://redis:6379/0"
+
     # Webhook shared secret used to verify HMAC-SHA256 signatures.
     webhook_secret: str = "change-me"
 

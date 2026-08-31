@@ -10,6 +10,7 @@ from app.bootstrap import seed
 from app.config import get_settings
 from app.routers import tickets, webhooks, websocket
 from app.state_machine import InvalidTransitionError
+from app.ws import manager
 
 settings = get_settings()
 
@@ -20,7 +21,13 @@ async def lifespan(app: FastAPI):
     # sample data unless disabled (DESKLY_SEED=false).
     if os.getenv("DESKLY_SEED", "true").lower() != "false":
         await seed()
-    yield
+    # Connect the WebSocket manager to Redis (falls back to local-only if the
+    # broker is not reachable).
+    await manager.startup(settings.redis_url)
+    try:
+        yield
+    finally:
+        await manager.shutdown()
 
 
 app = FastAPI(title="Deskly API", version="1.0.0", lifespan=lifespan)
