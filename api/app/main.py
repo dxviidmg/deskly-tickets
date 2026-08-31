@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.bootstrap import init_db
+from app.bootstrap import seed
 from app.config import get_settings
 from app.routers import tickets, webhooks, websocket
 from app.state_machine import InvalidTransitionError
@@ -16,9 +16,10 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create schema (and seed sample data unless disabled) on startup.
-    with_seed = os.getenv("DESKLY_SEED", "true").lower() != "false"
-    await init_db(with_seed=with_seed)
+    # Schema is created by Alembic migrations before startup. Here we only seed
+    # sample data unless disabled (DESKLY_SEED=false).
+    if os.getenv("DESKLY_SEED", "true").lower() != "false":
+        await seed()
     yield
 
 

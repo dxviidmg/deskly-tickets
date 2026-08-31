@@ -1,21 +1,14 @@
-"""Database bootstrap helpers: create tables and seed sample data.
+"""Database bootstrap helpers.
 
-For this prototype we create the schema from SQLAlchemy metadata on startup
-instead of running Alembic migrations. Rationale (see DECISIONES.md): a single
-initial schema with no production data to migrate makes full migration tooling
-unnecessary overhead. Alembic is listed as a next step if the schema evolves.
+The schema is managed by Alembic migrations (run via `alembic upgrade head`
+before the app starts; see the Docker entrypoint and README). This module only
+provides an idempotent sample-data seed used on startup for the prototype.
 """
 from sqlalchemy import select
 
-from app.db import Base, SessionLocal, engine
+from app.db import SessionLocal
 from app.enums import Prioridad
 from app.models import Ticket
-
-
-async def create_tables() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
 
 SAMPLE_TICKETS = [
     ("No puedo iniciar sesión", "El login devuelve 500.", Prioridad.alta, "ana"),
@@ -40,9 +33,3 @@ async def seed() -> None:
                 )
             )
         await session.commit()
-
-
-async def init_db(with_seed: bool = True) -> None:
-    await create_tables()
-    if with_seed:
-        await seed()
