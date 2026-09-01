@@ -5,62 +5,56 @@
  * para que el usuario pueda verificar lo que escribe.
  */
 
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import type { InputHTMLAttributes } from "react";
 
 /**
  * Props del campo de contraseña.
- * Extiende los atributos estándar de input para ser compatible con react-hook-form.
+ * Extiende los atributos estándar de input para ser compatible con
+ * react-hook-form (que inyecta name, onChange, onBlur y ref vía register()).
  */
-interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
-  /** Valor actual de la contraseña */
-  value?: string;
-  /** Callback cuando cambia el valor */
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}
+type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
 
 /**
  * Input de contraseña con toggle de visibilidad.
- * 
- * @example
+ *
+ * IMPORTANTE: usa forwardRef para reenviar el `ref` al <input> real. Sin esto,
+ * react-hook-form no puede leer el valor del campo (trabaja con componentes no
+ * controlados leyendo el DOM a través del ref), y la validación fallaría con
+ * "expected string, received undefined".
+ *
+ * @example Con react-hook-form
+ * ```tsx
+ * <PasswordInput {...register("password")} placeholder="Contraseña" />
+ * ```
+ *
+ * @example Controlado (estado manual)
  * ```tsx
  * <PasswordInput
  *   value={password}
  *   onChange={(e) => setPassword(e.target.value)}
  *   placeholder="Tu contraseña"
- *   required
  * />
  * ```
  */
-export function PasswordInput({
-  value,
-  onChange,
-  placeholder = "Contraseña",
-  required = false,
-  disabled = false,
-  minLength,
-  className = "",
-  ...rest
-}: PasswordInputProps) {
-  const [showPassword, setShowPassword] = useState(false);
+export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
+  function PasswordInput({ placeholder = "Contraseña", className = "", disabled = false, ...rest }, ref) {
+    const [showPassword, setShowPassword] = useState(false);
 
-  const toggleVisibility = () => {
-    setShowPassword(!showPassword);
-  };
+    const toggleVisibility = () => {
+      setShowPassword(!showPassword);
+    };
 
-  return (
-    <div className="relative flex items-center">
-      <input
-        type={showPassword ? "text" : "password"}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        disabled={disabled}
-        minLength={minLength}
-        className={`w-full rounded-md border border-slate-300 px-3 py-2 text-sm pr-10 ${className}`}
-        {...rest}
-      />
+    return (
+      <div className="relative flex items-center">
+        <input
+          ref={ref}
+          type={showPassword ? "text" : "password"}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={`w-full rounded-md border border-slate-300 px-3 py-2 text-sm pr-10 ${className}`}
+          {...rest}
+        />
       <button
         type="button"
         onClick={toggleVisibility}
@@ -109,4 +103,4 @@ export function PasswordInput({
       </button>
     </div>
   );
-}
+});
