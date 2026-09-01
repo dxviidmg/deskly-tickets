@@ -184,18 +184,6 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 
 ---
 
-### [Decisión] Frontend sin librería de estado (React Query u otras)
-
-**Contexto:** El frontend tiene que listar tickets, filtrarlos, ver el detalle y actualizarse en vivo. Una opción habitual es añadir una librería de datos como React Query.
-
-**Uso de LLM:** Le pedí el frontend con Next.js 14.
-
-**Salida del modelo:** Propuso resolverlo con las herramientas propias de Next y React (componentes de servidor para la carga inicial y `fetch`), sin añadir librerías extra.
-
-**Mi decisión:** Acepté no meter React Query ni un store global. Para este alcance, los componentes de servidor de Next (para la carga inicial) y `useState`/`useEffect` (para la interacción y el tiempo real) son suficientes. Menos dependencias, menos cosas que explicar y defender. Si la app creciera (mucha caché, sincronización compleja), reconsideraría una librería de datos.
-
----
-
 ### [Decisión] SSR solo en el detalle; dashboard interactivo en el cliente
 
 **Contexto:** El reto pide que el **detalle** `/tickets/[id]` sea renderizado en el servidor (SSR). El dashboard, en cambio, necesita filtro y actualización en vivo.

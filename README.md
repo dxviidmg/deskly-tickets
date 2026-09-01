@@ -52,8 +52,8 @@ tickets de muestra. Cambia estas credenciales en `.env` antes de cualquier uso r
 Con el stack levantado:
 
 ```bash
-# 1) Salud del API
-curl http://localhost:8000/health        # {"status":"ok"}
+# 1) Salud del API (verifica DB y Redis)
+curl http://localhost:8000/health
 
 # 2) Login (obtiene un token JWT)
 TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
@@ -80,7 +80,7 @@ pytest
 ```
 
 Cubren la máquina de estados (transiciones válidas e inválidas), el webhook
-(firma válida/ inválida, payload malformado, idempotencia) y la autenticación
+(firma válida/inválida, payload malformado, idempotencia) y la autenticación
 (login, rutas protegidas, permisos de administrador).
 
 ---
@@ -111,14 +111,8 @@ curl -i -X POST http://localhost:8000/api/webhooks/tickets \
 **Notas:**
 
 - **`event_id`**: texto libre (hasta 120 caracteres) que identifica el evento en el
-  sistema del proveedor. Depende de la convención de cada proveedor:
-  - Inc: `inc-001`, `inc-002`, ...
-  - Salesforce: `sf-00Q1234567`, ...
-  - Jira: `jira-PROJ-1234`, ...
-  - Otro sistema: `myapp-event-uuid-xyz`, ...
-  
-  Deskly usa `event_id` para garantizar **idempotencia**: si se reenvía el mismo
-  `event_id`, devuelve el ticket existente sin crear un duplicado.
+  sistema del proveedor. Deskly usa `event_id` para garantizar **idempotencia**:
+  si se reenvía el mismo `event_id`, devuelve el ticket existente sin crear un duplicado.
 
 - **Asignación**: Los tickets creados vía webhook **siempre llegan sin asignar**
   (asignado_a_id = NULL). No hay campo `asignado_a_id` en el payload. Un agente
@@ -141,8 +135,7 @@ delegando la garantía a la propia base de datos. El detalle está en
 
 ### Índices justificados
 
-- `ix_tickets_estado` — el listado del dashboard filtra por estado (el filtro más
-  frecuente).
+- `ix_tickets_estado` — el listado del dashboard filtra por estado (el filtro más frecuente).
 - `ix_tickets_prioridad` — segundo filtro disponible.
 - `ix_tickets_asignado_a_id` — para consultar tickets por usuario asignado.
 - `UNIQUE (event_id)` en `webhook_events` — garantiza la idempotencia del webhook.
@@ -152,44 +145,70 @@ delegando la garantía a la propia base de datos. El detalle está en
 ## Funcionalidad
 
 **Backend**
-- CRUD de tickets con paginación y filtros por estado/prioridad.
+- CRUD de tickets con paginación y filtros por estado/prioridad/asignado.
 - Máquina de estados explícita (`abierto → en_progreso → resuelto → cerrado`, con
   reapertura desde `resuelto`). Una transición inválida devuelve **409** con un
   mensaje claro, no un 500.
 - Comentarios por ticket.
-- Webhook de ingesta con firma HMAC-SHA256 (401/422), idempotencia por `event_id`
-  y protección contra *replay* por timestamp.
-- WebSocket `/ws/tickets` con eventos `ticket.creado` / `ticket.actualizado` /
-  `ticket.comentado`, difundidos vía **Redis pub/sub** (escala a varias instancias).
+- Webhook de ingesta con firma HMAC-SHA256 (401/422), idempotencia por `event_id`.
+- WebSocket `/ws/tickets` con eventos tipados (`DomainEvent` enum), difundidos vía
+  **Redis pub/sub** (escala a varias instancias).
 - Autenticación **JWT** y usuarios con permiso `is_admin`.
+- Health check extendido que verifica DB y Redis.
+- Repository Pattern para lógica de negocio desacoplada.
 
 **Frontend**
-- Dashboard con tabla paginada y filtro; estados de UI diferenciados (carga,
-  vacío, error).
+- Dashboard con tabla paginada, filtros y highlight visual en actualizaciones.
 - Detalle `/tickets/[id]` **renderizado en servidor (SSR)** con hilo de
-  comentarios y botones de transición.
-- Hook `useTicketStream` (WebSocket) con limpieza en `useEffect`, reconexión
-  automática e indicador visible de conexión.
-- Login y gestión de usuarios (solo administradores).
+  comentarios, historial de cambios y edición inline.
+- React Query para cache y sincronización automática.
+- Zod + react-hook-form para validación de formularios.
+- Toasts (sonner) para feedback de acciones.
+- Error Boundary para manejo de errores por página.
+- Constants centralizadas para labels y colores.
+- DataTable abstracto reutilizable.
+- Hook `useTicketStream` (WebSocket) con reconexión automática e indicador de conexión.
 
 ---
 
-## Qué dejé fuera (y por qué)
+## Arquitectura
 
-- **Idempotencia/replay del webhook como "producción real"**: implementados, pero
-  el manejo de una colisión concurrente exacta del mismo `event_id` (dos
-  peticiones simultáneas) confía en la restricción `UNIQUE`; no añadí manejo
-  explícito del `IntegrityError` concurrente por simplicidad.
-- **La autenticación es una ampliación**: el enunciado no pedía usuarios ni login.
-  Los añadí (usuarios, JWT, permisos `is_admin`, `asignado_a` como referencia a un
-  usuario) como valor añadido, priorizándolos **después** de tener funcionando el
-  núcleo. La decisión y sus límites están en `DECISIONES.md`.
-- **Vulnerabilidad transitiva de `postcss`**: aparece dentro del `node_modules`
-  propio de Next.js (herramienta de *build*, no de ejecución). Solucionarla obliga
-  a subir a Next 16 (cambio mayor); no lo hice para no arriesgar la estabilidad del
-  App Router en esta entrega.
-- **Escalado del WebSocket**: preparado con Redis pub/sub, pero no incluí
-  configuración de múltiples réplicas ni balanceador; queda como paso siguiente.
+### Backend
+- `app/repositories/` — Lógica de negocio desacoplada de los routers.
+- `app/routers/` — Endpoints HTTP delgados.
+- `app/models.py` — Modelos SQLAlchemy con relaciones y listeners.
+- `app/enums.py` — Enumeraciones tipadas (`Estado`, `Prioridad`, `DomainEvent`).
+- `app/state_machine.py` — Máquina de estados explícita.
+
+### Frontend
+- `lib/api.ts` — Cliente API tipado con soporte SSR.
+- `lib/schemas.ts` — Schemas Zod para validación de formularios.
+- `lib/constants.ts` — Labels y colores centralizados.
+- `lib/types.ts` — Tipos TypeScript espejo del backend.
+- `components/DataTable.tsx` — Tabla abstracta reutilizable.
+- `components/QueryProvider.tsx` — Provider de React Query.
+
+---
+
+## CI/CD
+
+Pipeline con GitHub Actions:
+- **Backend:** lint (ruff) + migrations check (alembic check) + tests (pytest)
+- **Frontend:** lint (next lint) + build (type-check + compile)
+
+---
+
+## Límites conocidos
+
+- **Idempotencia del webhook**: el manejo de una colisión concurrente exacta del
+  mismo `event_id` (dos peticiones simultáneas) confía en la restricción `UNIQUE`
+  de la base de datos.
+- **Vulnerabilidad transitiva de `postcss`**: aparece en node_modules de Next.js.
+  Solucionarla obliga a subir a Next 16 (cambio mayor).
+- **Escalado del WebSocket**: preparado con Redis pub/sub, pero sin configuración
+  de múltiples réplicas ni balanceador.
+- **Seed con timestamps escalonados**: los inserts usan SQLAlchemy Core para
+  evitar disparar los listeners de `events.py`, que fijarían `creado_en = now()`.
 
 ---
 
