@@ -92,7 +92,7 @@ El webhook verifica una firma **HMAC-SHA256** del cuerpo con el secreto
 
 ```bash
 SECRET=change-me   # el valor de WEBHOOK_SECRET en tu .env
-BODY='{"event_id":"evt-1","titulo":"Ticket externo","descripcion":"Creado vía webhook","prioridad":"alta"}'
+BODY='{"event_id":"inc-001","titulo":"Ticket externo","descripcion":"Creado vía webhook","prioridad":"alta"}'
 SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
 
 # Firma válida -> 201 (crea el ticket)
@@ -108,9 +108,21 @@ curl -i -X POST http://localhost:8000/api/webhooks/tickets \
   -d "$BODY"
 ```
 
-- Firma inválida o ausente → **401**.
-- Firma válida pero payload malformado → **422**.
-- Reenviar el mismo `event_id` no crea un ticket duplicado (idempotencia).
+**Notas:**
+
+- **`event_id`**: texto libre (hasta 120 caracteres) que identifica el evento en el
+  sistema del proveedor. Depende de la convención de cada proveedor:
+  - Inc: `inc-001`, `inc-002`, ...
+  - Salesforce: `sf-00Q1234567`, ...
+  - Jira: `jira-PROJ-1234`, ...
+  - Otro sistema: `myapp-event-uuid-xyz`, ...
+  
+  Deskly usa `event_id` para garantizar **idempotencia**: si se reenvía el mismo
+  `event_id`, devuelve el ticket existente sin crear un duplicado.
+
+- Firma inválida o ausente → **401 Unauthorized**.
+- Firma válida pero payload malformado → **422 Unprocessable Entity**.
+- Reenviar el mismo `event_id` → devuelve el ticket creado antes (idempotencia).
 
 ---
 

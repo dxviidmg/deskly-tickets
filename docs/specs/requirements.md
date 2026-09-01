@@ -156,6 +156,18 @@ Criterios de aceptación:
 6. *(Bonus)* Cuando el `timestamp` de la petición es demasiado viejo, el sistema
    deberá rechazarla (protección contra replay).
 
+**Nota sobre `event_id`:** es un texto libre (hasta 120 caracteres) que identifica
+el evento en el sistema del proveedor. Su formato depende de la convención de cada
+proveedor:
+- Sistema Inc: `inc-001`, `inc-002`, ...
+- Salesforce: `sf-00Q1234567`, ...
+- Jira: `jira-PROJ-1234`, ...
+- Otro sistema: `myapp-event-uuid-xyz`, ...
+
+El proveedor es responsable de generar y mantener la unicidad de `event_id` en su
+propio dominio. Deskly lo usa como clave para idempotencia: rechaza duplicados sin
+fallar, simplemente devuelve el ticket ya creado.
+
 ---
 
 ## 5. WebSocket en tiempo real
