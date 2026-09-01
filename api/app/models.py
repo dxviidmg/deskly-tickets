@@ -1,4 +1,12 @@
-"""SQLAlchemy ORM models."""
+"""Modelos ORM de SQLAlchemy para la base de datos.
+
+Define las tablas principales del sistema:
+- User: Usuarios del sistema (agentes y administradores)
+- Ticket: Tickets de soporte
+- Comment: Comentarios en los tickets
+- WebhookEvent: Eventos de webhook procesados (para idempotencia)
+- StateLog: Registro de auditoría de cambios de estado
+"""
 from datetime import datetime
 
 from sqlalchemy import (
@@ -18,6 +26,11 @@ from app.enums import Estado, Prioridad
 
 
 class User(Base):
+    """Usuario del sistema (agente o administrador).
+    
+    Un usuario puede ser asignado a tickets y puede tener permisos de
+    administrador (is_admin=True) para gestionar otros usuarios.
+    """
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -25,7 +38,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     apellidos: Mapped[str] = mapped_column(String(120), nullable=False)
-    # Whether the user can manage (CRUD) other users.
+    # Si el usuario puede gestionar (CRUD) a otros usuarios
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -33,10 +46,17 @@ class User(Base):
 
     @property
     def nombre_completo(self) -> str:
+        """Devuelve el nombre completo del usuario (nombre + apellidos)."""
         return f"{self.nombre} {self.apellidos}"
 
 
 class Ticket(Base):
+    """Ticket de soporte.
+    
+    Un ticket puede estar asignado a un usuario (agente) y tiene un ciclo
+    de vida definido por la máquina de estados. Puede tener comentarios
+    y un historial de cambios de estado.
+    """
     __tablename__ = "tickets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -48,7 +68,7 @@ class Ticket(Base):
     estado: Mapped[Estado] = mapped_column(
         String(20), nullable=False, default=Estado.abierto
     )
-    # The agent (user) the ticket is assigned to. Null = unassigned.
+    # El agente (usuario) al que está asignado el ticket. NULL = sin asignar
     asignado_a_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -62,32 +82,40 @@ class Ticket(Base):
         nullable=False,
     )
 
+    # Relación con el usuario asignado (carga eagerly con "joined")
     asignado: Mapped["User | None"] = relationship("User", lazy="joined")
 
+    # Comentarios del ticket (se borran en cascada si se borra el ticket)
     comments: Mapped[list["Comment"]] = relationship(
         back_populates="ticket",
         cascade="all, delete-orphan",
         order_by="Comment.creado_en",
     )
 
+    # Historial de cambios de estado (se borran en cascada)
     state_log: Mapped[list["StateLog"]] = relationship(
         cascade="all, delete-orphan",
         order_by="StateLog.creado_en.asc()",
     )
 
     __table_args__ = (
-        # Listing filters by estado (most common dashboard filter) and prioridad.
+        # Índices para los filtros más comunes del dashboard
         Index("ix_tickets_estado", "estado"),
         Index("ix_tickets_prioridad", "prioridad"),
     )
 
     @property
     def asignado_a(self) -> str | None:
-        """Convenience: assigned user's email (for API responses)."""
+        """Devuelve el email del usuario asignado (para respuestas API)."""
         return self.asignado.email if self.asignado else None
 
 
 class Comment(Base):
+    """Comentario en un ticket.
+    
+    Los comentarios se muestran en el detalle del ticket y ayudan
+    a documentar el progreso del mismo.
+    """
     __tablename__ = "comments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -103,11 +131,17 @@ class Comment(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    # Relación inversa con el ticket
     ticket: Mapped["Ticket"] = relationship(back_populates="comments")
 
 
 class WebhookEvent(Base):
-    """Processed webhook events, used to enforce idempotency."""
+    """Evento de webhook procesado.
+    
+    Se usa para garantizar idempotencia: si se recibe el mismo event_id
+    dos veces, solo se crea un ticket. La restricción UNIQUE en event_id
+    lo impide a nivel de base de datos.
+    """
 
     __tablename__ = "webhook_events"
 
@@ -124,7 +158,11 @@ class WebhookEvent(Base):
 
 
 class StateLog(Base):
-    """Audit log for ticket state transitions and assignments."""
+    """Registro de auditoría de cambios de estado y asignación.
+    
+    Cada vez que un ticket cambia de estado o de asignado, se registra
+    aquí para tener un historial completo del ciclo de vida del ticket.
+    """
 
     __tablename__ = "state_log"
 
@@ -133,6 +171,7 @@ class StateLog(Base):
         Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True
     )
     mensaje: Mapped[str] = mapped_column(Text, nullable=False)
+    # Usuario que realizó el cambio (puede ser NULL si el listener no tiene acceso)
     usuario_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

@@ -1,13 +1,14 @@
-"""WebSocket connection manager with Redis pub/sub fan-out.
+"""Gestor de conexiones WebSocket con fan-out via Redis pub/sub.
 
-Each backend process keeps its own set of live WebSocket connections (that is
-inherent to WebSockets). To make events reach clients connected to *any*
-instance, events are published to a Redis channel; a background subscriber in
-every instance receives them and relays them to its local connections.
+Cada proceso del backend mantiene su propio conjunto de conexiones WebSocket
+activas (es inherente a WebSockets). Para que los eventos lleguen a clientes
+conectados a cualquier instancia, se publican en un canal Redis; un suscriptor
+en segundo plano en cada instancia los recibe y los retransmite a sus conexiones
+locales.
 
-Redis is optional for local/test runs: if it is not configured or not
-reachable, the manager falls back to broadcasting directly to local
-connections, so the app (and the test suite) works without Redis.
+Redis es opcional para ejecuciones locales/tests: si no está configurado o no
+está accesible, el gestor hace broadcast directamente a las conexiones locales,
+así la app (y la suite de tests) funciona sin Redis.
 """
 import asyncio
 import json
@@ -23,17 +24,31 @@ EVENTS_CHANNEL = "deskly:events"
 
 
 class ConnectionManager:
+    """Gestiona las conexiones WebSocket y el broadcast de eventos.
+    
+    Métodos principales:
+    - startup: Conectar a Redis e iniciar el suscriptor
+    - shutdown: Cerrar conexiones y detener el suscriptor
+    - connect: Aceptar una nueva conexión WebSocket
+    - disconnect: Eliminar una conexión
+    - broadcast: Enviar un evento a todos los clientes conectados
+    """
+
     def __init__(self) -> None:
+        """Inicializa el gestor con conjuntos vacíos."""
         self._connections: set[WebSocket] = set()
         self._lock = asyncio.Lock()
         self._redis: Any | None = None
         self._pubsub: Any | None = None
         self._reader_task: asyncio.Task | None = None
 
-    # --- lifecycle -------------------------------------------------------
+    # --- ciclo de vida ---------------------------------------------------
 
     async def startup(self, redis_url: str | None) -> None:
-        """Connect to Redis and start the subscriber. No-op/fallback on error."""
+        """Conecta a Redis e inicia el suscriptor. No-op si no hay Redis.
+        
+        Si Redis no está disponible, el gestor funciona en modo local-only.
+        """
         if not redis_url:
             logger.info("No REDIS_URL set; WebSocket runs in local-only mode.")
             return
@@ -56,6 +71,7 @@ class ConnectionManager:
             self._pubsub = None
 
     async def shutdown(self) -> None:
+        """Cierra todas las conexiones y detiene el suscriptor de Redis."""
         if self._reader_task is not None:
             self._reader_task.cancel()
             try:
@@ -77,24 +93,30 @@ class ConnectionManager:
                 pass
             self._redis = None
 
-    # --- connections -----------------------------------------------------
+    # --- conexiones ------------------------------------------------------
 
     async def connect(self, websocket: WebSocket) -> None:
+        """Acepta una nueva conexión WebSocket y la añade al conjunto."""
         await websocket.accept()
         async with self._lock:
             self._connections.add(websocket)
 
     async def disconnect(self, websocket: WebSocket) -> None:
+        """Elimina una conexión del conjunto (el cliente se desconectó)."""
         async with self._lock:
             self._connections.discard(websocket)
 
-    # --- publishing / broadcasting --------------------------------------
+    # --- publicación / broadcast ----------------------------------------
 
     async def broadcast(self, tipo: str, datos: Any) -> None:
-        """Publish an event so every instance can relay it to its clients.
-
-        With Redis: publish to the channel; the subscriber (here and in other
-        instances) delivers it locally. Without Redis: deliver locally now.
+        """Publica un evento para que todas las instancias lo retransmitan.
+        
+        Con Redis: publica en el canal; el suscriptor (aquí y en otras
+        instancias) lo entrega localmente. Sin Redis: entrega local directamente.
+        
+        Args:
+            tipo: Tipo de evento (DomainEvent)
+            datos: Datos del evento (normalmente un TicketOut)
         """
         message = {"tipo": tipo, "datos": jsonable_encoder(datos)}
         if self._redis is not None:
@@ -106,7 +128,7 @@ class ConnectionManager:
         await self._broadcast_local(message)
 
     async def _reader(self) -> None:
-        """Background task: relay messages from Redis to local connections."""
+        """Tarea en segundo plano: retransmite mensajes de Redis a conexiones locales."""
         assert self._pubsub is not None
         try:
             async for message in self._pubsub.listen():
@@ -123,10 +145,10 @@ class ConnectionManager:
             logger.warning("Redis subscriber stopped: %s", exc)
 
     async def _broadcast_local(self, message: dict) -> None:
-        """Send a ready message to every locally connected client.
-
-        Connections that fail are dropped so a dead client never blocks the
-        others and never raises silent errors.
+        """Envía un mensaje a todos los clientes conectados localmente.
+        
+        Las conexiones que fallan se eliminan para que un cliente muerto
+        nunca bloquee a los demás ni lance errores silenciosos.
         """
         async with self._lock:
             targets = list(self._connections)

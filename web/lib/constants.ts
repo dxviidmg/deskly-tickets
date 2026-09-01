@@ -1,5 +1,17 @@
+/**
+ * Constantes centralizadas para estados y prioridades.
+ * 
+ * Define:
+ * - Listas de valores posibles (ESTADOS, PRIORIDADES)
+ * - Etiquetas en español para mostrar en la UI
+ * - Clases de Tailwind para colores de badges
+ * 
+ * Usar estas constantes en lugar de strings literales asegura
+ * consistencia en toda la aplicación.
+ */
 import type { Estado, Prioridad } from "./types";
 
+/** Lista de todos los estados posibles de un ticket */
 export const ESTADOS: Estado[] = [
   "abierto",
   "en_progreso",
@@ -8,8 +20,10 @@ export const ESTADOS: Estado[] = [
   "cerrado",
 ];
 
+/** Lista de todos los niveles de prioridad */
 export const PRIORIDADES: Prioridad[] = ["baja", "media", "alta", "urgente"];
 
+/** Etiquetas en español para mostrar en la UI */
 export const ESTADOS_LABELS: Record<Estado, string> = {
   abierto: "Abierto",
   en_progreso: "En progreso",
@@ -18,6 +32,7 @@ export const ESTADOS_LABELS: Record<Estado, string> = {
   cerrado: "Cerrado",
 };
 
+/** Etiquetas en español para prioridades */
 export const PRIORIDADES_LABELS: Record<Prioridad, string> = {
   baja: "Baja",
   media: "Media",
@@ -25,6 +40,7 @@ export const PRIORIDADES_LABELS: Record<Prioridad, string> = {
   urgente: "Urgente",
 };
 
+/** Clases de Tailwind para colorear badges de estado */
 export const ESTADOS_COLORS: Record<Estado, string> = {
   abierto: "bg-slate-100 text-slate-700",
   en_progreso: "bg-blue-100 text-blue-700",
@@ -33,6 +49,7 @@ export const ESTADOS_COLORS: Record<Estado, string> = {
   cerrado: "bg-gray-100 text-gray-600",
 };
 
+/** Clases de Tailwind para colorear badges de prioridad */
 export const PRIORIDADES_COLORS: Record<Prioridad, string> = {
   baja: "bg-green-100 text-green-700",
   media: "bg-yellow-100 text-yellow-700",
