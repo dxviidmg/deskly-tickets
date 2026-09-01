@@ -11,17 +11,21 @@ pip install requests python-dotenv
 ## Setup
 
 1. Ensure the Deskly API is running (http://localhost:8000)
-2. Check your `.env` file for `API_URL` and `WEBHOOK_SECRET`
+2. Optionally set `API_URL` in your `.env` (defaults to `http://localhost:8000`)
 
 ```bash
-# .env (at project root)
+# .env (at project root, optional)
 API_URL=http://localhost:8000
-WEBHOOK_SECRET=change-me
 ```
 
-If not set, defaults are:
-- `API_URL=http://localhost:8000`
-- `WEBHOOK_SECRET=change-me`
+When running the script, you will be prompted to enter:
+- `Webhook Secret` — the HMAC-SHA256 secret for your test
+- `Event ID` — unique identifier for the webhook event
+- `Title` — ticket title (max 200 chars)
+- `Description` — ticket description
+- `Priority` — select from menu (baja, media, alta, urgente)
+
+**Note:** `WEBHOOK_SECRET` is NOT read from `.env`. You input it interactively when testing.
 
 ## Usage
 
@@ -29,63 +33,108 @@ If not set, defaults are:
 python test_webhook.py
 ```
 
+An interactive menu appears with the following options:
+
+```
+Main Menu
+1) Send webhook (manual input)
+2) Send webhook (from example)
+3) Test invalid signature (should return 401)
+4) Test malformed payload (should return 422)
+5) Test idempotency (same event_id twice)
+6) Exit
+```
+
 ## Features
 
-### 1. Send Webhook
-- **Choose a provider example**: Inc, Salesforce, Jira, or Custom
-- **Edit payload**: Customize event_id, titulo, descripcion, prioridad, asignado_a_id
-- **Automatic signature generation**: HMAC-SHA256 computed and injected
-- **Timestamp support**: Optional X-Timestamp header for replay protection testing
-- **Live response inspection**: See status code, headers, and parsed JSON response
+### Option 1: Send Webhook (Manual Input)
+You input all required fields:
+- **Webhook Secret** (required): The HMAC secret used to sign the request
+- **Event ID** (required): Unique identifier (e.g., `inc-001`, `sf-123`)
+- **Title** (required, max 200 chars): The ticket title
+- **Description** (required): The ticket description
+- **Priority** (selector): Choose from `baja`, `media`, `alta`, `urgente`
+- **Assignee ID** (optional): User ID or leave blank
 
-### 2. Test Invalid Signature
-Sends a request with a deliberately wrong signature:
+Then the script:
+- Computes HMAC-SHA256 signature automatically
+- Sends the request with proper headers
+- Displays the response in real-time
+
+### Option 2: Send Webhook (From Example)
+- Choose a provider example (Inc, Salesforce, Jira, Custom)
+- Input the Webhook Secret
+- Optionally edit other fields
+- Send and inspect response
+
+### 3. Test Invalid Signature
+- You input all payload fields (manual input required)
+- Script sends with deliberately wrong signature
 - Expected response: **401 Unauthorized**
-- Verifies that signature validation happens before payload processing
 
-### 3. Test Malformed Payload
-Sends a request missing the required `titulo` field:
+### 4. Test Malformed Payload
+- You input the Webhook Secret
+- Script sends a payload missing the required `titulo` field
 - Expected response: **422 Unprocessable Entity**
-- Verifies that payload validation rejects incomplete data
 
-### 4. Test Idempotency
-Sends the same event_id twice:
-- First request: Should create ticket (201)
-- Second request: Should return existing ticket (200)
-- Demonstrates idempotency protection against retries
+### 5. Test Idempotency
+- You input all payload fields (manual input required)
+- Script sends the same request twice automatically
+- Observe: First → 201 (created), Second → 200 (idempotent duplicate)
 
-## Example Workflows
+### Workflow Examples
 
-### Workflow 1: Quick Manual Test
+#### Workflow 1: Quick Test with Manual Input
 ```
-1. Select "Send webhook (choose example or custom)"
-2. Choose "1 (Inc)"
-3. Press Enter to skip editing
-4. Watch response appear in real-time
-```
+$ python test_webhook.py
+Select option: 1
 
-### Workflow 2: Integration Test with Custom Data
-```
-1. Select "Send webhook"
-2. Choose "4 (Custom)"
-3. Edit payload to match your test case
-4. Send and inspect response
-```
+Webhook Secret: my-secret-key-123
+Event ID: inc-001
+Title: Database connection failed
+Description: The API cannot connect to PostgreSQL
+Priority:
+  1) baja
+  2) media
+  3) alta
+  4) urgente
+Select (1-4): 4
+Assignee ID: [press Enter]
 
-### Workflow 3: Security Testing
-```
-1. Select "Test invalid signature"
-2. Verify API rejects with 401
-3. Select "Test malformed payload"
-4. Verify API rejects with 422
+[Request sent, response displayed]
+✓ Webhook accepted! Ticket created.
 ```
 
-### Workflow 4: Idempotency Verification
+#### Workflow 2: Test from Example
 ```
-1. Select "Test idempotency"
-2. Choose a provider
-3. Tool sends same event_id twice automatically
-4. Observe both responses (first creates, second returns existing)
+Select option: 2
+Available examples:
+  1) Inc
+  2) Salesforce
+  3) Jira
+  4) Custom
+Select example: 1
+Webhook Secret: change-me
+Edit payload? (y/n): n
+
+[Request sent, response displayed]
+```
+
+#### Workflow 3: Security Testing
+```
+Select option: 3  # Invalid signature test
+Webhook Secret: my-secret
+Event ID: test-001
+...
+[Sends with wrong signature]
+Status Code: 401
+✓ Correctly rejected invalid signature (401)
+
+Select option: 4  # Malformed payload test
+Webhook Secret: my-secret
+[Sends payload without titulo field]
+Status Code: 422
+✓ Correctly rejected malformed payload (422)
 ```
 
 ## Provider Examples
@@ -111,8 +160,9 @@ Sends the same event_id twice:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `API_URL` | `http://localhost:8000` | Base URL of Deskly API |
-| `WEBHOOK_SECRET` | `change-me` | HMAC-SHA256 secret (must match API's `WEBHOOK_SECRET`) |
+
+**Note:** `WEBHOOK_SECRET` is provided interactively in the script, not from `.env`.
 
 ## Exit
 
-Press Ctrl+C or select option 5 to exit gracefully.
+Press Ctrl+C or select option 6 to exit gracefully.

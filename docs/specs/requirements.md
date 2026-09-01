@@ -144,7 +144,7 @@ Criterios de aceptación:
 
 1. Cuando llega `POST /api/webhooks/tickets` con una firma HMAC-SHA256 válida en
    el header `X-Signature` y un payload correcto, el sistema deberá crear el
-   ticket y devolver `201`.
+   ticket **sin asignar** (asignado_a_id = NULL) y devolver `201`.
 2. Cuando la firma es inválida o falta el header, el sistema deberá devolver
    `401` sin crear el ticket.
 3. Cuando la firma es válida pero el payload está malformado, el sistema deberá
@@ -167,6 +167,11 @@ proveedor:
 El proveedor es responsable de generar y mantener la unicidad de `event_id` en su
 propio dominio. Deskly lo usa como clave para idempotencia: rechaza duplicados sin
 fallar, simplemente devuelve el ticket ya creado.
+
+**Nota sobre asignación:** Los tickets creados vía webhook siempre llegan **sin
+asignar** (asignado_a_id = NULL). No hay campo `asignado_a_id` en el payload. Un
+agente deberá asignarse (o ser asignado) manualmente desde la interfaz de Deskly
+después de la creación.
 
 ---
 

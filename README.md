@@ -95,7 +95,7 @@ SECRET=change-me   # el valor de WEBHOOK_SECRET en tu .env
 BODY='{"event_id":"inc-001","titulo":"Ticket externo","descripcion":"Creado vía webhook","prioridad":"alta"}'
 SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
 
-# Firma válida -> 201 (crea el ticket)
+# Firma válida -> 201 (crea el ticket sin asignar)
 curl -i -X POST http://localhost:8000/api/webhooks/tickets \
   -H "Content-Type: application/json" \
   -H "X-Signature: $SIG" \
@@ -119,6 +119,10 @@ curl -i -X POST http://localhost:8000/api/webhooks/tickets \
   
   Deskly usa `event_id` para garantizar **idempotencia**: si se reenvía el mismo
   `event_id`, devuelve el ticket existente sin crear un duplicado.
+
+- **Asignación**: Los tickets creados vía webhook **siempre llegan sin asignar**
+  (asignado_a_id = NULL). No hay campo `asignado_a_id` en el payload. Un agente
+  deberá asignarse manualmente desde la interfaz de Deskly después de la creación.
 
 - Firma inválida o ausente → **401 Unauthorized**.
 - Firma válida pero payload malformado → **422 Unprocessable Entity**.

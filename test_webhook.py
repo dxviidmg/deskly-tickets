@@ -66,7 +66,6 @@ def example_inc() -> dict[str, Any]:
         "titulo": "Critical: Database connection timeout",
         "descripcion": "The application cannot connect to the primary database. Failover to replica in progress.",
         "prioridad": "urgente",
-        "asignado_a_id": None,
     }
 
 
@@ -77,7 +76,6 @@ def example_salesforce() -> dict[str, Any]:
         "titulo": "Customer complaint: Login issues",
         "descripcion": "Account SF-00Q1234567 reports persistent login failures since 10:30 UTC.",
         "prioridad": "alta",
-        "asignado_a_id": None,
     }
 
 
@@ -88,7 +86,6 @@ def example_jira() -> dict[str, Any]:
         "titulo": "PROJ-1234: Fix API rate limiting",
         "descripcion": "The API rate limiter is incorrectly rejecting valid requests. Root cause: misconfigured Redis TTL.",
         "prioridad": "media",
-        "asignado_a_id": None,
     }
 
 
@@ -99,7 +96,6 @@ def example_custom() -> dict[str, Any]:
         "titulo": "Custom event",
         "descripcion": "Edit this example to match your needs.",
         "prioridad": "media",
-        "asignado_a_id": None,
     }
 
 
@@ -129,10 +125,102 @@ def get_example_data(choice: str) -> dict[str, Any] | None:
     return None
 
 
+def select_prioridad() -> str:
+    """Interactive selector for priority level."""
+    prioridades = ["baja", "media", "alta", "urgente"]
+    print("\nSelect priority:")
+    for i, p in enumerate(prioridades, 1):
+        print(f"  {i}) {p}")
+    
+    while True:
+        choice = input("Select (1-4): ").strip()
+        if choice in ["1", "2", "3", "4"]:
+            return prioridades[int(choice) - 1]
+        print_error("Invalid choice. Please select 1-4.")
+
+
+def get_simple_payload(webhook_secret: str) -> dict[str, Any]:
+    """Quick payload: only ask for title and description, use predefined values for others."""
+    print("\n" + "="*70)
+    print("  Quick Webhook Test (using .env WEBHOOK_SECRET)")
+    print("="*70 + "\n")
+    
+    # Event ID (auto-generated)
+    event_id = f"test-{int(time.time())}"
+    print(f"Event ID (auto-generated): {event_id}")
+    
+    # Title
+    titulo = input("Title (required, max 200 chars): ").strip()
+    if not titulo or len(titulo) > 200:
+        print_error("Title must be 1-200 characters")
+        return get_simple_payload(webhook_secret)
+    
+    # Description
+    descripcion = input("Description (required): ").strip()
+    if not descripcion:
+        print_error("Description cannot be empty")
+        return get_simple_payload(webhook_secret)
+    
+    # Priority (default to media)
+    prioridad = "media"
+    print(f"Priority (default): {prioridad}")
+    
+    return {
+        "event_id": event_id,
+        "titulo": titulo,
+        "descripcion": descripcion,
+        "prioridad": prioridad,
+        "_webhook_secret": webhook_secret,
+    }
+
+
+def get_manual_payload() -> dict[str, Any]:
+    """Get payload by asking user for all required fields."""
+    print("\n" + "="*70)
+    print("  Enter Webhook Payload")
+    print("="*70 + "\n")
+    
+    # Webhook Secret
+    webhook_secret = input("Webhook Secret (required): ").strip()
+    if not webhook_secret:
+        print_error("Webhook secret cannot be empty")
+        return get_manual_payload()
+    
+    # Event ID
+    event_id = input("Event ID (required, e.g., 'inc-001', 'sf-123'): ").strip()
+    if not event_id or len(event_id) > 120:
+        print_error("Event ID must be 1-120 characters")
+        return get_manual_payload()
+    
+    # Title
+    titulo = input("Title (required, max 200 chars): ").strip()
+    if not titulo or len(titulo) > 200:
+        print_error("Title must be 1-200 characters")
+        return get_manual_payload()
+    
+    # Description
+    descripcion = input("Description (required): ").strip()
+    if not descripcion:
+        print_error("Description cannot be empty")
+        return get_manual_payload()
+    
+    # Priority (selector)
+    prioridad = select_prioridad()
+    
+    return {
+        "event_id": event_id,
+        "titulo": titulo,
+        "descripcion": descripcion,
+        "prioridad": prioridad,
+        "_webhook_secret": webhook_secret,  # Store for later use
+    }
+
+
 def edit_json_in_place(data: dict[str, Any]) -> dict[str, Any]:
     """Allow user to edit the JSON payload interactively."""
     print("\nCurrent payload:")
-    print(json.dumps(data, indent=2))
+    display_data = {k: v for k, v in data.items() if k != "_webhook_secret"}
+    print(json.dumps(display_data, indent=2))
     print("\nEdit fields (or press Enter to skip):")
 
     fields = ["event_id", "titulo", "descripcion", "prioridad", "asignado_a_id"]
@@ -146,6 +234,11 @@ def edit_json_in_place(data: dict[str, Any]) -> dict[str, Any]:
                 except ValueError:
                     data[field] = None
                     print_error(f"Invalid integer for {field}, set to None")
+            elif field == "prioridad":
+                if user_input in ["baja", "media", "alta", "urgente"]:
+                    data[field] = user_input
+                else:
+                    print_error(f"Invalid priority. Must be one of: baja, media, alta, urgente")
             else:
                 data[field] = user_input
 
@@ -153,13 +246,19 @@ def edit_json_in_place(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def send_webhook(
-    api_url: str, webhook_secret: str, payload: dict[str, Any], include_timestamp: bool = False
+    api_url: str, payload: dict[str, Any], include_timestamp: bool = False
 ) -> None:
     """Send webhook and display response."""
     print_header("Sending Webhook")
 
-    # Serialize payload
-    body = json.dumps(payload, separators=(",", ":")).encode()
+    # Make a copy to avoid modifying the original
+    payload_copy = payload.copy()
+    
+    # Extract webhook_secret from payload
+    webhook_secret = payload_copy.pop("_webhook_secret", "change-me")
+    
+    # Serialize payload (without the webhook_secret)
+    body = json.dumps(payload_copy, separators=(",", ":")).encode()
     signature = compute_signature(body, webhook_secret)
 
     # Prepare headers
@@ -179,14 +278,17 @@ def send_webhook(
         else:
             print(f"  {key}: {value}")
     print("\nPayload:")
-    print(json.dumps(payload, indent=2))
+    print(json.dumps(payload_copy, indent=2))
 
     # Send request
     print("\nSending...\n")
     try:
+        # Send the exact bytes that were signed (`body`). Using `json=` would
+        # let requests re-serialize the payload with different separators,
+        # producing a body that no longer matches the signature (-> 401).
         response = requests.post(
             f"{api_url}/api/webhooks/tickets",
-            json=payload,
+            data=body,
             headers=headers,
             timeout=10,
         )
@@ -217,7 +319,10 @@ def test_invalid_signature(api_url: str, payload: dict[str, Any]) -> None:
     """Test webhook with invalid signature."""
     print_header("Testing Invalid Signature")
 
-    body = json.dumps(payload, separators=(",", ":")).encode()
+    # Remove webhook_secret from display
+    payload_copy = {k: v for k, v in payload.items() if k != "_webhook_secret"}
+    
+    body = json.dumps(payload_copy, separators=(",", ":")).encode()
     headers = {
         "Content-Type": "application/json",
         "X-Signature": "invalid-signature-xyz",
@@ -231,7 +336,7 @@ def test_invalid_signature(api_url: str, payload: dict[str, Any]) -> None:
     try:
         response = requests.post(
             f"{api_url}/api/webhooks/tickets",
-            json=payload,
+            data=body,
             headers=headers,
             timeout=10,
         )
@@ -273,7 +378,7 @@ def test_malformed_payload(api_url: str, webhook_secret: str) -> None:
     try:
         response = requests.post(
             f"{api_url}/api/webhooks/tickets",
-            json=bad_payload,
+            data=body,
             headers=headers,
             timeout=10,
         )
@@ -289,7 +394,7 @@ def test_malformed_payload(api_url: str, webhook_secret: str) -> None:
         print_error(f"Request failed: {e}")
 
 
-def test_idempotency(api_url: str, webhook_secret: str, payload: dict[str, Any]) -> None:
+def test_idempotency(api_url: str, payload: dict[str, Any]) -> None:
     """Test webhook idempotency with same event_id."""
     print_header("Testing Idempotency (Same event_id)")
 
@@ -297,7 +402,7 @@ def test_idempotency(api_url: str, webhook_secret: str, payload: dict[str, Any])
 
     # First request
     print("📨 First request:")
-    send_webhook(api_url, webhook_secret, payload, include_timestamp=False)
+    send_webhook(api_url, payload.copy(), include_timestamp=False)
 
     print("\n" + "="*70)
     print("Waiting 2 seconds before second request...\n")
@@ -305,7 +410,7 @@ def test_idempotency(api_url: str, webhook_secret: str, payload: dict[str, Any])
 
     # Second request (same event_id)
     print("📨 Second request (same event_id):")
-    send_webhook(api_url, webhook_secret, payload, include_timestamp=False)
+    send_webhook(api_url, payload.copy(), include_timestamp=False)
 
 
 def main() -> None:
@@ -316,21 +421,34 @@ def main() -> None:
 
     print_header("Deskly Webhook Testing Tool")
     print_info(f"API URL: {api_url}")
-    print_info(f"Webhook Secret: {webhook_secret[:10]}...")
+    print_info(f"Webhook Secret from .env: {webhook_secret[:10]}...")
 
     while True:
         print("\n" + "="*70)
         print("Main Menu")
         print("="*70)
-        print("\n1) Send webhook (choose example or custom)")
-        print("2) Test invalid signature (should return 401)")
-        print("3) Test malformed payload (should return 422)")
-        print("4) Test idempotency (same event_id twice)")
-        print("5) Exit")
+        print("\n1) Quick test (uses .env WEBHOOK_SECRET, only ask title + description)")
+        print("2) Send webhook (manual input - ask for everything)")
+        print("3) Send webhook (from example)")
+        print("4) Test invalid signature (should return 401)")
+        print("5) Test malformed payload (should return 422)")
+        print("6) Test idempotency (same event_id twice)")
+        print("7) Exit")
 
-        choice = input("\nSelect option (1-5): ").strip()
+        choice = input("\nSelect option (1-7): ").strip()
 
         if choice == "1":
+            # Quick test: only ask for titulo and descripcion
+            payload = get_simple_payload(webhook_secret)
+            send_webhook(api_url, payload, include_timestamp=True)
+
+        elif choice == "2":
+            # Manual input for all fields
+            payload = get_manual_payload()
+            send_webhook(api_url, payload, include_timestamp=True)
+
+        elif choice == "3":
+            # Choose from examples and edit
             show_examples()
             example_choice = input("\nSelect example (1-4): ").strip()
             payload = get_example_data(example_choice)
@@ -338,44 +456,45 @@ def main() -> None:
             if payload is None:
                 print_error("Invalid choice")
                 continue
+
+            # Ask for webhook_secret
+            webhook_secret_input = input("\nWebhook Secret (required): ").strip()
+            if not webhook_secret_input:
+                print_error("Webhook secret cannot be empty")
+                continue
+            
+            payload["_webhook_secret"] = webhook_secret_input
 
             edit = input("Edit payload? (y/n) [n]: ").strip().lower()
             if edit == "y":
                 payload = edit_json_in_place(payload)
 
-            send_webhook(api_url, webhook_secret, payload, include_timestamp=True)
-
-        elif choice == "2":
-            show_examples()
-            example_choice = input("\nSelect example (1-4): ").strip()
-            payload = get_example_data(example_choice)
-
-            if payload is None:
-                print_error("Invalid choice")
-                continue
-
-            test_invalid_signature(api_url, payload)
-
-        elif choice == "3":
-            test_malformed_payload(api_url, webhook_secret)
+            send_webhook(api_url, payload, include_timestamp=True)
 
         elif choice == "4":
-            show_examples()
-            example_choice = input("\nSelect example (1-4): ").strip()
-            payload = get_example_data(example_choice)
-
-            if payload is None:
-                print_error("Invalid choice")
-                continue
-
-            test_idempotency(api_url, webhook_secret, payload)
+            # Test invalid signature
+            payload = get_manual_payload()
+            test_invalid_signature(api_url, payload)
 
         elif choice == "5":
+            # Test malformed payload
+            webhook_secret_input = input("Webhook Secret (required): ").strip()
+            if not webhook_secret_input:
+                print_error("Webhook secret cannot be empty")
+                continue
+            test_malformed_payload(api_url, webhook_secret_input)
+
+        elif choice == "6":
+            # Test idempotency
+            payload = get_manual_payload()
+            test_idempotency(api_url, payload)
+
+        elif choice == "7":
             print("\nGoodbye!")
             break
 
         else:
-            print_error("Invalid option. Please select 1-5.")
+            print_error("Invalid option. Please select 1-7.")
 
 
 if __name__ == "__main__":

@@ -85,7 +85,6 @@ class WebhookTicketIn(BaseModel):
     titulo: str = Field(min_length=1, max_length=200)
     descripcion: str = Field(min_length=1)
     prioridad: Prioridad = Prioridad.media
-    asignado_a_id: int | None = None
 
 
 # --- Auth & Users --------------------------------------------------------
