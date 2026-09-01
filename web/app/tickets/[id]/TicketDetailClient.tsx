@@ -411,13 +411,11 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
                       className="border-l-2 border-slate-200 pl-3"
                     >
                       <p className="text-sm text-slate-700">{log.mensaje}</p>
-                      <time
-                        dateTime={log.creado_en}
-                        title={new Date(log.creado_en).toLocaleString()}
-                        className="text-xs text-slate-400"
-                      >
-                        {tiempoRelativo(log.creado_en)}
-                      </time>
+                      <div className="mt-1 text-xs text-slate-400">
+                        <span>{new Date(log.creado_en).toLocaleString()}</span>
+                        <span className="ml-2 text-slate-300">·</span>
+                        <span className="ml-2">{tiempoRelativo(log.creado_en)}</span>
+                      </div>
                     </li>
                   ))}
                 </ol>

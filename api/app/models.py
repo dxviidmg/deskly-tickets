@@ -72,7 +72,7 @@ class Ticket(Base):
 
     state_log: Mapped[list["StateLog"]] = relationship(
         cascade="all, delete-orphan",
-        order_by="StateLog.creado_en.desc()",
+        order_by="StateLog.creado_en.asc()",
     )
 
     __table_args__ = (
