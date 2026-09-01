@@ -177,7 +177,30 @@ que funcionan con múltiples instancias/workers del backend. Si Redis no está
 disponible (p. ej. en tests o arranque local sin broker), el manager difunde solo
 a las conexiones locales del proceso (modo de respaldo tolerante a fallos).
 
-## 8. Frontend
+## 8. Historial de cambios (StateLog)
+
+Tabla `state_log` para registrar transiciones y asignaciones con un mensaje legible:
+
+```sql
+CREATE TABLE state_log (
+  id SERIAL PRIMARY KEY,
+  ticket_id INT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  mensaje TEXT NOT NULL,  -- "Cambio de status: abierto → en_progreso" o "Asignado a: user@example.com"
+  usuario_id INT REFERENCES users(id),  -- quién hizo el cambio (puede ser NULL si no hay usuario)
+  creado_en TIMESTAMP DEFAULT NOW(),
+  INDEX ix_state_log_ticket_id (ticket_id),
+  INDEX ix_state_log_creado_en (creado_en)
+);
+```
+
+**Registro:** 
+- Al transicionar, se inserta `mensaje = f"Cambio de status: {estado_anterior} → {estado_nuevo}"`.
+- Al asignar, se inserta `mensaje = f"Asignado a: {usuario_nuevo.email}"` (si era sin asignar antes) o `"Asignado a: {usuario_nuevo.email}"` (así no guarda el anterior, pero es legible).
+- El `usuario_id` es quién hizo el cambio (usuario autenticado).
+
+El endpoint `GET /api/tickets/{id}` incluye `state_log` como array de objetos `{ id, mensaje, usuario_id, creado_en }`, ordenado por `creado_en DESC`.
+
+## 9. Frontend
 
 - `/` (dashboard): Server Component que hace fetch inicial paginado; filtro por
   estado vía query param. Estados de UI: carga (skeleton), vacío (mensaje +

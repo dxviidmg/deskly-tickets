@@ -43,11 +43,45 @@ Criterios de aceptación:
 **Historia:** Como agente quiero que el ciclo de vida del ticket esté controlado
 para evitar transiciones inconsistentes.
 
-Estados: `abierto`, `en_progreso`, `resuelto`, `cerrado`.
+Estados: `abierto`, `en_progreso`, `resuelto`, `reabierto`, `cerrado`.
 
 Transiciones válidas:
 
 - `abierto → en_progreso`
+- `en_progreso → resuelto`
+- `resuelto → cerrado` (finalizar)
+- `resuelto → reabierto` (reabrir si se encontró un problema)
+- `reabierto → en_progreso` (vuelve a trabajarse)
+- `cerrado → ` (sin salida; estado terminal)
+
+Criterios de aceptación:
+
+1. Cuando un usuario intenta una transición válida (ej. `abierto → en_progreso`),
+   el sistema deberá aplicarla y registrar el cambio en la tabla de logs con
+   timestamp, usuario que hizo el cambio, ticket, estado anterior y nuevo.
+2. Cuando un usuario intenta una transición inválida (ej. `en_progreso → cerrado`),
+   el sistema deberá devolver `409 Conflict` con un listado de transiciones
+   permitidas.
+3. Cuando un usuario asigna un ticket a otro usuario, el sistema deberá registrar
+   este cambio en la tabla de logs (tipo: asignación) con el usuario anterior y
+   nuevo.
+
+---
+
+## 3. Historial de cambios (logs)
+
+**Historia:** Como agente quiero ver un registro de cambios (auditoría) de cada
+ticket para entender qué pasó, cuándo y quién lo hizo.
+
+Criterios de aceptación:
+
+1. Cada cambio de estado genera un log con mensaje: "Cambio de status: [estado anterior] → [estado nuevo]".
+2. Cada asignación genera un log con mensaje: "Asignado a: [email del usuario]".
+3. Cada log incluye quién hizo el cambio (usuario autenticado) y un timestamp.
+4. El endpoint `GET /api/tickets/{id}` deberá incluir un array `state_log` con
+   los registros ordenados por timestamp descendente (más recientes primero).
+5. El detalle del ticket en el frontend deberá mostrar una sección "Historial de
+   cambios" listando los logs de forma legible.
 - `en_progreso → resuelto`
 - `resuelto → cerrado`
 - `resuelto → abierto` (reabierto)
