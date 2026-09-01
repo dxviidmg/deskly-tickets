@@ -5,3 +5,24 @@
 body {
   @apply bg-slate-50 text-slate-900;
 }
+
+/* Subtle entrance + highlight for rows that arrive or change via the live
+   WebSocket stream, so updates feel smooth instead of a hard refresh. */
+@keyframes ticket-row-in {
+  from {
+    background-color: rgb(219 234 254); /* blue-100 */
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.ticket-row-flash {
+  animation: ticket-row-in 1.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket-row-flash {
+    animation: none;
+  }
+}

@@ -67,6 +67,20 @@ function Dashboard() {
   const [assigningId, setAssigningId] = useState<number | null>(null);
   const [assignError, setAssignError] = useState("");
 
+  // Ids of rows that changed recently (via live events or inline actions), used
+  // to play a brief highlight so updates are noticeable but not jarring.
+  const [flashIds, setFlashIds] = useState<Set<number>>(new Set());
+  const flashRow = useCallback((id: number) => {
+    setFlashIds((prev) => new Set(prev).add(id));
+    setTimeout(() => {
+      setFlashIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 1200);
+  }, []);
+
   const load = useCallback(async () => {
     setState("loading");
     setError("");
@@ -92,14 +106,39 @@ function Dashboard() {
   }, [load]);
 
   // Assign (or clear) a ticket's assignee directly from the table row, reusing
-  // the same endpoint as the detail view. Refreshes the list afterwards.
+  // the same endpoint as the detail view. Patches the row in place (no full
+  // reload) so the table doesn't flash the loading skeleton.
   const assignUser = useCallback(
     async (ticketId: number, userId: number | null) => {
       setAssigningId(ticketId);
       setAssignError("");
       try {
-        await api.updateTicket(ticketId, { asignado_a_id: userId });
-        await load();
+        const updated = await api.updateTicket(ticketId, {
+          asignado_a_id: userId,
+        });
+        setData((prev) => {
+          if (!prev) return prev;
+          // If the updated ticket no longer matches the active filters, drop it.
+          const stillMatches =
+            (!estado || updated.estado === estado) &&
+            (!prioridad || updated.prioridad === prioridad) &&
+            (asignadoAId === null ||
+              (asignadoAId === -1
+                ? updated.asignado_a_id === null
+                : updated.asignado_a_id === asignadoAId));
+          if (!stillMatches) {
+            return {
+              ...prev,
+              items: prev.items.filter((t) => t.id !== ticketId),
+              total: Math.max(0, prev.total - 1),
+            };
+          }
+          return {
+            ...prev,
+            items: prev.items.map((t) => (t.id === ticketId ? updated : t)),
+          };
+        });
+        flashRow(ticketId);
       } catch (e) {
         setAssignError(
           e instanceof ApiError ? e.message : "No se pudo asignar el ticket"
@@ -108,15 +147,70 @@ function Dashboard() {
         setAssigningId(null);
       }
     },
-    [load]
+    [estado, prioridad, asignadoAId, flashRow]
   );
 
-  // Live updates: refresh the current view when a ticket event arrives.
-  const onEvent = useCallback(
-    (_event: TicketEvent) => {
-      load();
+  // Does a ticket belong to the currently active filters?
+  const matchesFilters = useCallback(
+    (t: Ticket) => {
+      if (estado && t.estado !== estado) return false;
+      if (prioridad && t.prioridad !== prioridad) return false;
+      if (asignadoAId !== null) {
+        if (asignadoAId === -1) {
+          if (t.asignado_a_id !== null) return false;
+        } else if (t.asignado_a_id !== asignadoAId) {
+          return false;
+        }
+      }
+      return true;
     },
-    [load]
+    [estado, prioridad, asignadoAId]
+  );
+
+  // Live updates: patch the current view in place instead of reloading the
+  // whole list. This avoids the loading skeleton flashing on every event,
+  // which felt like a full-page refresh.
+  const onEvent = useCallback(
+    (event: TicketEvent) => {
+      const incoming = event.datos;
+
+      setData((prev) => {
+        if (!prev) return prev;
+
+        const idx = prev.items.findIndex((t) => t.id === incoming.id);
+        const fits = matchesFilters(incoming);
+
+        // Update / comment on a ticket already visible.
+        if (idx !== -1) {
+          // If it no longer matches the active filters, drop it from the view.
+          if (!fits) {
+            const items = prev.items.filter((t) => t.id !== incoming.id);
+            return { ...prev, items, total: Math.max(0, prev.total - 1) };
+          }
+          const items = [...prev.items];
+          items[idx] = incoming;
+          return { ...prev, items };
+        }
+
+        // New ticket (or one that now matches the filters). Only surface it on
+        // page 1 so we don't distort other pages; still bump the total count.
+        if (fits && event.tipo === "ticket.creado") {
+          const items =
+            page === 1
+              ? [incoming, ...prev.items].slice(0, PAGE_SIZE)
+              : prev.items;
+          return { ...prev, items, total: prev.total + 1 };
+        }
+
+        return prev;
+      });
+
+      // Play the highlight for tickets that are (or become) visible on page 1.
+      if (matchesFilters(incoming) && (page === 1 || event.tipo !== "ticket.creado")) {
+        flashRow(incoming.id);
+      }
+    },
+    [matchesFilters, page, flashRow]
   );
   const { status } = useTicketStream(onEvent);
 
@@ -234,7 +328,12 @@ function Dashboard() {
               </thead>
               <tbody>
                 {data.items.map((t) => (
-                  <tr key={t.id} className="border-t hover:bg-slate-50">
+                  <tr
+                    key={t.id}
+                    className={`border-t hover:bg-slate-50 ${
+                      flashIds.has(t.id) ? "ticket-row-flash" : ""
+                    }`}
+                  >
                     <td className="px-4 py-2">
                       <Link
                         href={`/tickets/${t.id}`}
