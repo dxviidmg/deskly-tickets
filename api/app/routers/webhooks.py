@@ -42,6 +42,12 @@ async def ingest_ticket(
 ):
     raw_body = await request.body()
 
+    # --- DEBUG: comparar la firma recibida con la esperada ---------------
+    _expected_sig = hmac.new(
+        settings.webhook_secret.encode(), raw_body, hashlib.sha256
+    ).hexdigest()
+    _provided_sig = (x_signature or "").removeprefix("sha256=")
+
     # 1) Signature first -> 401 on failure.
     if not _valid_signature(settings.webhook_secret, raw_body, x_signature):
         raise HTTPException(
@@ -85,7 +91,7 @@ async def ingest_ticket(
         titulo=data.titulo,
         descripcion=data.descripcion,
         prioridad=data.prioridad,
-        asignado_a_id=data.asignado_a_id,
+        # Webhook-ingested tickets are always created unassigned (NULL)
     )
     session.add(ticket)
     await session.flush()
