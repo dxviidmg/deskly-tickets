@@ -3,13 +3,16 @@
 The schema is managed by Alembic migrations (run via `alembic upgrade head`
 before the app starts; see the Docker entrypoint and README). This module only
 provides an idempotent seed used on startup for the prototype: 10 users (an
-initial admin plus sample agents) and a few sample tickets.
+initial admin plus sample agents) and 100 sample tickets with varied states
+and priorities.
 """
+import random
+
 from sqlalchemy import select
 
 from app.config import get_settings
 from app.db import SessionLocal
-from app.enums import Prioridad
+from app.enums import Estado, Prioridad
 from app.models import Ticket, User
 from app.security import hash_password
 
@@ -72,24 +75,51 @@ async def seed() -> None:
         await session.commit()
         await session.refresh(admin)
 
-        # The first sample agent is used to assign the sample tickets below.
-        agent = await session.scalar(
-            select(User).where(User.email == "agente@deskly.com")
-        )
-
         # --- Sample tickets (only if none exist) ---
         existing = await session.scalar(select(Ticket).limit(1))
         if existing is None:
-            samples = [
-                ("No puedo iniciar sesión", "El login devuelve 500.", Prioridad.alta, agent.id),
-                ("Error al exportar CSV", "Se corta a 100 filas.", Prioridad.media, agent.id),
-                ("Solicitud de nueva feature", "Modo oscuro, por favor.", Prioridad.baja, None),
+            # All user ids (to spread assignments); include None for unassigned.
+            user_ids = list(
+                (await session.scalars(select(User.id).order_by(User.id))).all()
+            )
+            assignees: list[int | None] = [*user_ids, None]
+
+            estados = list(Estado)
+            prioridades = list(Prioridad)
+            asuntos = [
+                "No puedo iniciar sesión",
+                "Error al exportar CSV",
+                "La página carga muy lenta",
+                "Solicitud de nueva feature",
+                "Fallo al subir archivos adjuntos",
+                "El correo de notificación no llega",
+                "Error 500 al guardar el formulario",
+                "Problema con el pago",
+                "La búsqueda no devuelve resultados",
+                "Se pierde la sesión al recargar",
+                "El dashboard muestra datos incorrectos",
+                "No se aplican los filtros",
             ]
-            for titulo, descripcion, prioridad, asignado_id in samples:
+
+            # Deterministic pseudo-random data across restarts.
+            rng = random.Random(42)
+
+            for i in range(100):
+                # Cycle through states and priorities so every combination is
+                # represented, then add variety with the subject/assignee.
+                estado = estados[i % len(estados)]
+                prioridad = prioridades[i % len(prioridades)]
+                asunto = asuntos[i % len(asuntos)]
+                asignado_id = rng.choice(assignees)
                 session.add(
                     Ticket(
-                        titulo=titulo,
-                        descripcion=descripcion,
+                        titulo=f"{asunto} (#{i + 1})",
+                        descripcion=(
+                            f"Ticket de ejemplo número {i + 1}. "
+                            f"Estado inicial: {estado.value}, "
+                            f"prioridad: {prioridad.value}."
+                        ),
+                        estado=estado,
                         prioridad=prioridad,
                         asignado_a_id=asignado_id,
                     )
