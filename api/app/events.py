@@ -102,9 +102,11 @@ def receive_ticket_after_update(mapper, connection, target: Ticket):
     # get_history devuelve información de qué cambió en el campo "estado"
     estado_history = get_history(target, "estado")
     
-    # Verificar si el campo "estado" tiene cambios
-    # y que hay valores nuevos (modified)
-    if estado_history.has_changes() and estado_history.modified:
+    # Verificar si el campo "estado" tiene cambios.
+    # has_changes() ya indica si el valor fue modificado; el objeto History de
+    # SQLAlchemy NO tiene atributo `.modified` (solo added/deleted/unchanged),
+    # así que basta con has_changes().
+    if estado_history.has_changes():
         # El nuevo estado es el último valor en "added"
         nuevo_estado = estado_history.added[0] if estado_history.added else target.estado
         
