@@ -118,3 +118,12 @@ class UserOut(BaseModel):
     email: EmailStr
     is_admin: bool
     creado_en: datetime
+
+
+class UserOption(BaseModel):
+    """Reduced user representation for populating selects (no sensitive data)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: EmailStr
