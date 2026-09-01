@@ -791,6 +791,87 @@ desde `/openapi.json`, con un script `npm run types:gen`.
 siempre sincronizados, sin mantenimiento manual. Se puede integrar en CI o
 ejecutar manualmente cuando cambie la API.
 
+---
+
+## Mejoras de Frontend
+
+### [Decisión] Zod para validación de formularios
+
+**Contexto:** Los formularios validaban manualmente con `useState` y condicionales,
+repetitivo y propenso a errores.
+
+**Uso de LLM:** Propuse usar Zod + react-hook-form para validación declarativa.
+
+**Salida del modelo:** Crear `lib/schemas.ts` con schemas Zod para login, usuarios
+y tickets. Refactorizar login para usar `useForm` con `zodResolver`.
+
+**Mi decisión:** Acepté. Añadí las dependencias y creé schemas tipados. El login
+ahora tiene validación automática con mensajes de error inline. Beneficio:
+types inferidos de los schemas, validación consistente, menos código.
+
+### [Decisión] React Query para cache y sincronización
+
+**Contexto:** Cada página hacia fetch manual + useState para loading/error/data,
+con código repetitivo y sin cache.
+
+**Uso de LLM:** Propuse React Query para manejar estado de servidor.
+
+**Salida del modelo:** Crear `QueryProvider` con configuración sensible
+(staleTime 1min, sin refetchOnWindowFocus) y envolver la app.
+
+**Mi decisión:** Acepté. Instalé @tanstack/react-query y creé el provider.
+Beneficio: cache automático, deduplicación de requests, optimistic updates,
+menos boilerplate. Los hooks pueden migrarse gradualmente.
+
+### [Decisión] Constants centralizadas
+
+**Contexto:** Labels y colores de estados/prioridades repetidos en componentes.
+
+**Uso de LLM:** Propuse centralizar en `lib/constants.ts`.
+
+**Salida del modelo:** Un archivo con ESTADOS, PRIORIDADES, sus labels y colores,
+exportados como Records tipados.
+
+**Mi decisión:** Acepté. Beneficio: single source of truth, fácil de localizar,
+consistencia en toda la app.
+
+### [Decisión] Error Boundary por página
+
+**Contexto:** Sin manejo de errores a nivel de página. Un error podía romper
+toda la app.
+
+**Uso de LLM:** Propuse usar el error.tsx de Next.js 14.
+
+**Salida del modelo:** Crear `app/error.tsx` con UI simple y botón de reintentar.
+
+**Mi decisión:** Acepté. Beneficio: UX controlada ante errores, sin pantallas
+blancas, integración nativa con Next.js.
+
+### [Decisión] Toasts para feedback de acciones
+
+**Contexto:** Feedback solo con mensajes inline o alerts bloqueantes.
+
+**Uso de LLM:** Propuse usar sonner para toasts no bloqueantes.
+
+**Salida del modelo:** Instalar sonner y añadir `<Toaster />` al layout.
+
+**Mi decisión:** Acepté. Beneficio: feedback visual profesional, no bloqueante,
+consistentes en toda la app. Se puede usar con `toast.success()` y
+`toast.error()`.
+
+### [Decisión] DataTable abstracto reutilizable
+
+**Contexto:** La lógica de tablas (loading, empty, render) estaba en Dashboard
+con 396 LOC.
+
+**Uso de LLM:** Propuse extraer un componente DataTable genérico.
+
+**Salida del modelo:** Crear `components/DataTable.tsx` con tipado genérico,
+columnas configurables, estados de loading/empty, y soporte para flash visual.
+
+**Mi decisión:** Acepté. Beneficio: componente reusable en cualquier listado,
+reduce complejidad de páginas, consistencia visual.
+
 ### [Decisión] Corrección de requirements.txt y Suspense boundary
 
 **Contexto:** Al intentar levantar el proyecto con Docker, el build fallaba porque
