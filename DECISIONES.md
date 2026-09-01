@@ -716,3 +716,36 @@ detectó que `useSearchParams` requiere Suspense boundary en Next.js 14.
    requisitos de Next.js 14 con `useSearchParams`.
 
 Commits atómicos: uno para requirements.txt, otro para Suspense boundary.
+
+### [Decisión] Webhook: tickets siempre sin asignar
+
+**Contexto:** El campo `asignado_a_id` aparecía en el payload del webhook como
+opcional, pero según el diseño los tickets externos deben llegar sin asignar
+para que un agente los tome manualmente desde la interfaz.
+
+**Uso de LLM:** Sin LLM; fue una decisión de diseño basada en el flujo real de
+trabajo.
+
+**Salida del modelo:** N/A.
+
+**Mi decisión:** Eliminé `asignado_a_id` del schema `WebhookTicketIn` y de todos
+los ejemplos de prueba. El webhook ahora ignora cualquier intento de asignar y
+fuerza `asignado_a_id = NULL` en la creación. Actualicé README y especificaciones
+para documentar que la asignación es manual tras la creación.
+
+### [Decisión] Dashboard: actualización in-place con highlight visual
+
+**Contexto:** Al asignar un ticket desde la tabla, se recargaba toda la lista
+mostrando el skeleton de carga, lo que interrumpía la navegación.
+
+**Uso de LLM:** Le pedí que la asignación inline actualizara solo la fila
+afectada y añadierá un indicador visual del cambio.
+
+**Salida del modelo:** Propuso actualizar el estado local de la fila en lugar
+de llamar a `load()`, y añadir un flash CSS de 1.2s que se elimina solo.
+
+**Mi decisión:** Acepté. El estado se actualiza in-place (`setData` con map),
+y si el ticket actualizado ya no matchea los filtros activos, se elimina de
+la lista. Añadí una animación CSS (`ticket-row-flash`) que pinta la fila de
+azul brevemente, con soporte para `prefers-reduced-motion`. Mejora UX sin
+añadir dependencias.
