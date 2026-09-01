@@ -1,65 +1,135 @@
-# Deskly — orquestación de servicios.
-# Arranque: cp .env.example .env && docker compose up --build
+################################################################################
+# ARCHIVO: docker-compose.yml
+# PROPÓSITO: Orquestación de todos los servicios con Docker Compose
+#
+# Docker Compose permite definir y ejecutar múltiples contenedores Docker
+# como si fuera un solo sistema. Este archivo define 4 servicios:
+#
+# 1. db (PostgreSQL)      → Base de datos relacional
+# 2. redis               → Cache y pub/sub para WebSocket
+# 3. api (FastAPI)       → Backend de la aplicación
+# 4. web (Next.js)       → Frontend
+#
+# CÓMO USAR:
+#   1. Copiar variables de entorno:    cp .env.example .env
+#   2. Construir y arrancar servicios: docker compose up --build
+#   3. Parar servicios:                docker compose down
+#   4. Ver logs:                       docker compose logs -f api
+#
+# NOTAS:
+# - Los servicios están en la misma red Docker (se ven entre sí)
+# - Las variables ${VAR:-default} usan valor de .env o default si no existe
+# - Los healthchecks verifican que los servicios estén listos antes de iniciar
+#   los dependientes
+#
+################################################################################
+
 services:
+  # ========== SERVICIO: PostgreSQL 16 ==========
+  # Base de datos relacional. Almacena usuarios, tickets, comentarios, etc.
+  # Alpine es una versión tiny de Linux (~50MB vs 300MB)
   db:
     image: postgres:16-alpine
     environment:
+      # Variables de PostgreSQL (usuario, contraseña, BD por defecto)
+      # Los valores vienen de .env o usan los defaults aquí
       POSTGRES_USER: ${POSTGRES_USER:-deskly}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-deskly}
       POSTGRES_DB: ${POSTGRES_DB:-deskly}
     volumes:
+      # Volumen persistente: los datos sobreviven si se para el contenedor
+      # Sin esto, cada "docker compose up" estaría con BD vacía
       - db_data:/var/lib/postgresql/data
     healthcheck:
+      # Verificación de salud: ¿está PostgreSQL listo para conexiones?
+      # Se ejecuta cada 5s, timeout 5s, reintentos 10
+      # Si falla 10 veces = servicio considerado unhealthy
+      # El api NO arrancará hasta que db sea healthy
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deskly} -d ${POSTGRES_DB:-deskly}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  # ========== SERVICIO: Redis 7 ==========
+  # Cache en memoria + pub/sub para eventos WebSocket en tiempo real
+  # Permite que múltiples instancias del API compartan eventos de tickets
   redis:
     image: redis:7-alpine
     healthcheck:
+      # Verificar que Redis responde a PING
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
 
+  # ========== SERVICIO: FastAPI Backend ==========
+  # API REST que maneja tickets, usuarios, autenticación, webhooks, WebSocket
+  # Se construye desde ./api/Dockerfile (imagen personalizada)
   api:
     build: ./api
     depends_on:
+      # El API solo arranca cuando db y redis estén healthy
+      # "condition: service_healthy" espera a que los healthchecks pasen
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
+      # Variables de configuración de la app (ver app/config.py)
+      # Conexión a BD: dentro del network Docker se llama "db"
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://deskly:deskly@db:5432/deskly}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      
+      # Seguridad: secretos para webhooks y JWT (CAMBIAR EN PRODUCCIÓN)
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change-me}
       WEBHOOK_MAX_AGE_SECONDS: ${WEBHOOK_MAX_AGE_SECONDS:-300}
+      
+      # CORS: qué orígenes pueden acceder a la API (localhost:3000 en dev)
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      
+      # Seed: crear datos de ejemplo al arrancar (desabilitar en producción)
       DESKLY_SEED: ${DESKLY_SEED:-true}
+      
+      # JWT: configuración de tokens de autenticación
       JWT_SECRET: ${JWT_SECRET:-change-me-too}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      
+      # Usuario admin inicial
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@deskly.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
     ports:
+      # Exponer puerto 8000 del contenedor en el host
+      # Acceso: http://localhost:8000 (desde fuera del Docker)
+      # Docs: http://localhost:8000/docs
       - "8000:8000"
 
+  # ========== SERVICIO: Next.js Frontend ==========
+  # Interfaz web: dashboard de tickets, login, etc.
+  # Se construye desde ./web/Dockerfile (con multi-stage: deps → builder → runtime)
   web:
     build:
       context: ./web
       args:
-        # Baked into the browser bundle at build time.
+        # Estas URLs se "hornean" (bake) en el bundle de JavaScript en build-time
+        # El navegador las usa para conectar al API y WebSocket
+        # En producción: apuntar a dominio real (ej: https://api.example.com)
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8000/ws/tickets}
     depends_on:
+      # El web arranca después del api (aunque sea automático)
       - api
     environment:
-      # Used by the Next.js server (SSR) to reach the API inside the network.
+      # Configuración para Next.js server-side rendering (SSR)
+      # API_INTERNAL_URL: usado por Node.js en el servidor (dentro del Docker network)
+      #                   "api" es el nombre del servicio en Docker network
       API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8000}
+      
+      # Public URLs: usadas por el navegador (cliente)
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8000/ws/tickets}
     ports:
+      # Puerto 3000: acceso http://localhost:3000
       - "3000:3000"
 
 volumes:

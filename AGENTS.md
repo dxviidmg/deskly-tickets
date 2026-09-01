@@ -29,6 +29,40 @@ Estas reglas aplican SIEMPRE en este repositorio, en cualquier sesión.
 - Código en inglés; documentación en español.
 - Commits atómicos con mensajes descriptivos (se hacen cuando el usuario lo pide).
 
+## Documentación (REGLA OBLIGATORIA para todo código nuevo)
+
+**TODO nuevo código (features, bugfixes, refactoring) DEBE incluir documentación
+según la guía `GUIA_DOCUMENTACION.md`.**
+
+### Backend (Python)
+- Encabezado de archivo: `MÓDULO:` + propósito + conceptos clave
+- Cada función/clase: docstring con descripción, Args, Returns, Raises, Ejemplo
+- Comentarios explicativos para lógica compleja
+- Todos los comentarios en ESPAÑOL
+
+### Frontend (TypeScript/React)
+- Encabezado JSDoc explicando propósito del archivo
+- Componentes/hooks con JSDoc: qué hacen, props, ejemplos
+- Comentarios en ESPAÑOL explicando lógica no obvia
+- Mensajes de error en ESPAÑOL
+
+### DevOps/Config (Docker, CI/CD, etc.)
+- Encabezado explicando propósito
+- Cada sección comentada
+- Variables documentadas
+- Decisiones justificadas (por qué Docker, por qué este tamaño, etc.)
+
+### Estándares aplicables a TODO
+- ✅ Escribe como para alguien sin experiencia en esa tech
+- ✅ Explica conceptos clave la primera vez (qué es ORM, qué es async, etc.)
+- ✅ Incluye ejemplos reales de uso
+- ✅ Explica por qué (no solo qué)
+- ❌ NO comentarios obvios ("i = 0 // establecer i a 0")
+- ❌ NO comentarios sin contexto
+- ❌ NO documentación en inglés
+
+**Referencia:** Ver `GUIA_DOCUMENTACION.md` para ejemplos, anti-patrones y checklist completo.
+
 ## Entorno de desarrollo (Opción A)
 
 - `db` (PostgreSQL) y `redis` corren en Docker vía `docker-compose.override.yml`

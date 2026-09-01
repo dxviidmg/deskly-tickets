@@ -1,74 +1,138 @@
-"""Máquina de estados explícita para tickets.
-
-Define qué transiciones de estado son válidas. Cualquier transición
-que no esté en el mapa se rechaza con InvalidTransitionError.
-
-Esto permite que la lógica de negocio esté centralizada y sea testeable.
 """
+MÓDULO: state_machine.py - Máquina de estados explícita
+
+Una máquina de estados define qué transiciones son válidas.
+
+En Deskly, un ticket NO puede:
+- Ir de "resuelto" a "en_progreso" directamente
+- Ir de "cerrado" a otro estado
+- Saltarse estados
+
+Con una máquina de estados explícita:
+- La lógica de negocio está centralizada
+- Es fácil testear (sin tocar la BD)
+- Los errores son claros (409 Conflict en lugar de 500 Internal Error)
+- Es fácil cambiar reglas después (modificar ALLOWED_TRANSITIONS)
+
+Diagrama de estados:
+    abierto
+      |
+      v
+    en_progreso
+      |
+      v
+    resuelto -----> cerrado
+      |
+      +-----------> abierto (reabierto)
+
+Transiciones válidas:
+- abierto → en_progreso
+- en_progreso → resuelto
+- resuelto → cerrado
+- resuelto → abierto (reabierto)
+- cerrado → (ninguno, estado terminal)
+"""
+
 from app.enums import Estado
 
-# Mapa de transiciones: estado -> conjunto de estados alcanzables
+# Mapa de transiciones: estado → conjunto de estados alcanzables desde él
 ALLOWED_TRANSITIONS: dict[Estado, set[Estado]] = {
     Estado.abierto: {Estado.en_progreso},
     Estado.en_progreso: {Estado.resuelto},
-    # Desde "resuelto" se puede cerrar o reabrir
+    # Desde "resuelto" tenemos dos opciones
     Estado.resuelto: {Estado.cerrado, Estado.abierto},
-    Estado.cerrado: set(),  # Estado final, sin transiciones
+    # Desde "cerrado" no hay transiciones (estado final)
+    Estado.cerrado: set(),
 }
 
 
 class InvalidTransitionError(Exception):
-    """Excepción lanzada cuando una transición de estado no es válida.
+    """
+    Excepción lanzada cuando se intenta una transición inválida.
     
-    Contiene información sobre el estado actual, el solicitado y
-    los estados permitidos desde el actual.
+    Ejemplo: usuario intenta cambiar ticket de "cerrado" a "en_progreso"
+    
+    Attributes:
+        current (Estado): Estado actual del ticket
+        requested (Estado): Estado al que se quiso cambiar
+        allowed (list[str]): Estados válidos desde el actual
     """
 
     def __init__(self, current: Estado, requested: Estado) -> None:
-        # Normalizar a enum (pueden venir strings de la DB)
+        """
+        Inicializa la excepción con información de la transición fallida.
+        
+        Args:
+            current: Estado actual (puede ser string o enum)
+            requested: Estado solicitado (puede ser string o enum)
+        """
+        # Normalizar a enum (por si vienen como strings de la BD)
         current = Estado(current)
         requested = Estado(requested)
+        
         self.current = current
         self.requested = requested
-        # Lista de estados permitidos desde el actual
+        
+        # Lista de estados permitidos desde el actual (ordenados)
         self.allowed = sorted(
             e.value for e in ALLOWED_TRANSITIONS.get(current, set())
         )
+        
+        # Mensaje de error
         super().__init__(
             f"Invalid transition {current.value} -> {requested.value}"
         )
 
 
 def can_transition(current: Estado, requested: Estado) -> bool:
-    """Devuelve True si la transición de current a requested es válida.
-    
-    Acepta tanto valores del enum Estado como strings (útil cuando
-    el estado viene de la base de datos como texto).
+    """
+    Devuelve True si una transición es válida.
     
     Args:
-        current: Estado actual del ticket
-        requested: Estado al que se quiere transicionar
+        current (Estado): Estado actual del ticket
+        requested (Estado): Estado al que se quiere ir
         
     Returns:
-        True si la transición es válida, False en caso contrario
+        bool: True si la transición está en ALLOWED_TRANSITIONS, False si no
+        
+    Ejemplo:
+        if can_transition(Estado.abierto, Estado.en_progreso):
+            print("Transición válida")
+        else:
+            print("Transición inválida")
     """
+    # Normalizar a enum (pueden ser strings de la BD)
     current = Estado(current)
     requested = Estado(requested)
-    return requested in ALLOWED_TRANSITIONS.get(current, set())
+    
+    # Buscar current en el mapa, si no existe devolver set() vacío
+    allowed_from_current = ALLOWED_TRANSITIONS.get(current, set())
+    
+    # Verificar si requested está en los permitidos
+    return requested in allowed_from_current
 
 
 def assert_transition(current: Estado, requested: Estado) -> None:
-    """Lanza InvalidTransitionError si la transición no es válida.
+    """
+    Lanza InvalidTransitionError si la transición NO es válida.
     
-    Útil para usar en el código: si la transición es inválida, se
-    lanza excepción que el router convierte en HTTP 409.
+    Se usa en los routers: si la transición falla, esta función lanza
+    excepción que FastAPI convierte en HTTP 409.
     
     Args:
-        current: Estado actual del ticket
-        requested: Estado al que se quiere transicionar
+        current (Estado): Estado actual del ticket
+        requested (Estado): Estado al que se quiere ir
         
     Raises:
         InvalidTransitionError: Si la transición no está permitida
+        
+    Ejemplo:
+        @router.post("/tickets/{id}/transicion")
+        async def transition(ticket_id: int, payload: TransitionIn):
+            ticket = await repo.get_or_404(ticket_id)
+            assert_transition(ticket.estado, payload.nuevo_estado)  # Lanza si es inválida
+            ticket.estado = payload.nuevo_estado
+            await session.commit()
     """
     if not can_transition(current, requested):
         raise InvalidTransitionError(current, requested)

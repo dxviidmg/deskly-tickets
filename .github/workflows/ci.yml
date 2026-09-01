@@ -1,52 +1,164 @@
+################################################################################
+# ARCHIVO: .github/workflows/ci.yml
+# PROPÓSITO: Pipeline de Integración Continua (CI) con GitHub Actions
+#
+# CI (Continuous Integration) significa que cada push/PR se valida automáticamente:
+# 1. Se compila el código
+# 2. Se ejecutan linters (verifican estilo, problemas)
+# 3. Se ejecutan tests
+# 4. Se reportan resultados
+#
+# Si algo falla, se notifica al desarrollador INMEDIATAMENTE.
+# Esto evita mergear código roto a main.
+#
+# ¿Cuándo se ejecuta?
+# - En cada push a main
+# - En cada pull request
+#
+# Trabajos (jobs): Backend y Frontend corren en paralelo
+# - Job 1: Backend (Python lint, migrations check, tests)
+# - Job 2: Frontend (JS/TS lint, build, type-check)
+#
+# Runner: máquina Ubuntu donde se ejecutan los jobs
+# (GitHub proporciona runners gratis con ~10 GB RAM)
+################################################################################
+
+# Nombre del workflow (aparece en GitHub Actions UI)
 name: CI
 
+# Triggers: cuándo ejecutar este workflow
 on:
   push:
+    # Solo en push a main (no en cada rama)
     branches: [main]
   pull_request:
+    # En cada pull request (sin importar destino)
 
+# Trabajos a ejecutar
 jobs:
+  # ========== JOB 1: Backend ==========
+  # Nombre legible del job (aparece en GitHub)
   backend:
     name: Backend (lint + tests)
+    
+    # Runner: máquina Ubuntu última versión
+    # GitHub proporciona estos runners gratis
     runs-on: ubuntu-latest
+    
+    # Directorio de trabajo por defecto para todos los steps
+    # "working-directory: api" = todos los comandos se ejecutan en api/
     defaults:
       run:
         working-directory: api
+    
+    # Pasos que ejecuta este job
     steps:
+      # Paso 1: Clonar el repositorio
       - uses: actions/checkout@v4
+      
+      # Paso 2: Instalar Python 3.12
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      
+      # Paso 3: Instalar dependencias
       - name: Install dependencies
         run: |
+          # Actualizar pip
           python -m pip install --upgrade pip
+          # Instalar desde requirements.txt
           pip install -r requirements.txt
+      
+      # Paso 4: Lint con ruff
+      # Ruff verifica:
+      # - Importes no usados
+      # - Código "muerto"
+      # - Estilo de código
+      # - Posibles bugs
+      # Detiene el job si encuentra problemas
       - name: Lint (ruff)
         run: ruff check app tests
+      
+      # Paso 5: Verificar migraciones de BD
+      # Alembic verifica que:
+      # - Las migraciones están en orden correcto
+      # - No hay conflictos
+      # - El esquema es válido
       - name: Check migrations
         run: alembic check
+      
+      # Paso 6: Ejecutar tests
+      # pytest ejecuta todos los tests en tests/
+      # -q: quiet (solo muestra resumen, no detalles)
+      # Si falla 1 test, el job falla
       - name: Tests (pytest)
         run: pytest -q
 
+  # ========== JOB 2: Frontend ==========
+  # Similar a backend pero para JavaScript/TypeScript/React
   frontend:
     name: Frontend (lint + build)
+    
     runs-on: ubuntu-latest
+    
     defaults:
       run:
         working-directory: web
+    
     steps:
+      # Paso 1: Clonar repositorio
       - uses: actions/checkout@v4
+      
+      # Paso 2: Instalar Node.js 22
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          # Cache: reutilizar node_modules entre ejecuciones
+          # (mucho más rápido que reinstalar 1000 paquetes)
           cache: npm
           cache-dependency-path: web/package-lock.json
+      
+      # Paso 3: Instalar dependencias
+      # npm ci (clean install) vs npm install:
+      # - npm ci: instala exactamente las versiones en package-lock.json
+      # - npm install: puede instalar versiones más nuevas
+      # En CI, siempre usar npm ci para reproducibilidad
       - name: Install dependencies
         run: npm ci
+      
+      # Paso 4: Lint con ESLint/Prettier
+      # Verifica estilo de código, reglas React, etc.
       - name: Lint
         run: npm run lint
+      
+      # Paso 5: Build
+      # npm run build ejecuta:
+      # 1. tsc: type-check (verifica tipos TypeScript)
+      # 2. next build: compila y optimiza la app
+      # Si hay errores de tipos o problemas, falla
+      # NEXT_PUBLIC_API_URL y NEXT_PUBLIC_WS_URL son locales para el build
+      # (en producción serían URLs reales)
       - name: Build (type-check + compile)
         run: npm run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
           NEXT_PUBLIC_WS_URL: ws://localhost:8000/ws/tickets
+
+# ========== FLUJO GENERAL ==========
+# 1. Developer: git push (o crea PR)
+# 2. GitHub Actions: Dispara el workflow CI
+# 3. Dos jobs en paralelo:
+#    - Backend: lint → migrations check → tests
+#    - Frontend: lint → build
+# 4. Si ambos pasan:
+#    ✓ PR aparece como "passed" (se puede mergear con seguridad)
+# 5. Si alguno falla:
+#    ✗ PR aparece como "failed" (se debe arreglar antes de mergear)
+# 6. Developer: ve errores en GitHub, arregla, hace push de nuevo
+# 7. CI corre automáticamente en el nuevo push
+#
+# Beneficios:
+# - Código roto NUNCA se mergea a main
+# - Tests siempre se ejecutan (no confíes en "lo testeé en mi máquina")
+# - Consistencia: mismo build en todos lados
+# - Feedback rápido: minutos, no días
