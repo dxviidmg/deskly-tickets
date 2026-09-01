@@ -85,6 +85,7 @@ export interface ListParams {
   page?: number;
   size?: number;
   estado?: Estado | "";
+  prioridad?: Prioridad | "";
 }
 
 export const api = {
@@ -105,6 +106,7 @@ export const api = {
     q.set("page", String(params.page ?? 1));
     q.set("size", String(params.size ?? 10));
     if (params.estado) q.set("estado", params.estado);
+    if (params.prioridad) q.set("prioridad", params.prioridad);
     return request<Page<Ticket>>(`/api/tickets?${q.toString()}`, { token });
   },
   getTicket(id: number, token?: string | null): Promise<TicketDetail> {

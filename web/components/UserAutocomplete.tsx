@@ -9,13 +9,20 @@ interface Props {
   currentEmail: string | null; // email currently assigned (for display)
   onSelect: (userId: number | null) => void;
   disabled?: boolean;
+  /** Width utility class for the container. Defaults to a fixed width. */
+  className?: string;
 }
 
 /**
  * Searchable user picker (Autocomplete). Shows up to 5 users, queries the
  * backend as you type, and always offers "Asignarme a mí" as the first option.
  */
-export function UserAutocomplete({ currentEmail, onSelect, disabled }: Props) {
+export function UserAutocomplete({
+  currentEmail,
+  onSelect,
+  disabled,
+  className = "w-72",
+}: Props) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -55,7 +62,7 @@ export function UserAutocomplete({ currentEmail, onSelect, disabled }: Props) {
   };
 
   return (
-    <div ref={boxRef} className="relative w-72">
+    <div ref={boxRef} className={`relative ${className}`}>
       <button
         type="button"
         disabled={disabled}
