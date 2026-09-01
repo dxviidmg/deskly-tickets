@@ -28,13 +28,13 @@ Configuración de env.py:
 """
 
 import asyncio
+import os
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
-from app.config import get_settings
 from app.db import Base
 
 # Importar modelos para que se registren en Base.metadata
@@ -48,9 +48,15 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Inyectar DATABASE_URL desde app/config.py en lugar de alembic.ini
-# Razón: fuente única de verdad. No queremos dos URL de BD en dos archivos.
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# Inyectar DATABASE_URL desde variable de entorno
+# Usamos os.environ directamente para evitar que Pydantic lea del .env local
+# En Docker, la variable viene de docker-compose.yml
+# En desarrollo local, puede venir de .env o del entorno
+database_url = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://deskly:deskly@db:5432/deskly"
+)
+config.set_main_option("sqlalchemy.url", database_url)
 
 # Metadata: información del esquema de BD (tablas, columnas, índices)
 # Alembic lo usa para detectar cambios
