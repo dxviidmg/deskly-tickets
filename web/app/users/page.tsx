@@ -153,7 +153,7 @@ function UsersAdmin() {
           <div className="flex-1">
             <PasswordInput
               value={password}
-              onChange={setPassword}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="Contraseña (mín. 6)"
               required
               minLength={6}

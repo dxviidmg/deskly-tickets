@@ -6,22 +6,17 @@
  */
 
 import { useState } from "react";
+import type { InputHTMLAttributes } from "react";
 
-interface PasswordInputProps {
+/**
+ * Props del campo de contraseña.
+ * Extiende los atributos estándar de input para ser compatible con react-hook-form.
+ */
+interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   /** Valor actual de la contraseña */
-  value: string;
+  value?: string;
   /** Callback cuando cambia el valor */
-  onChange: (value: string) => void;
-  /** Placeholder del campo */
-  placeholder?: string;
-  /** Si el campo es obligatorio */
-  required?: boolean;
-  /** Si el campo está deshabilitado */
-  disabled?: boolean;
-  /** Longitud mínima de la contraseña */
-  minLength?: number;
-  /** Clases CSS adicionales */
-  className?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 /**
@@ -31,7 +26,7 @@ interface PasswordInputProps {
  * ```tsx
  * <PasswordInput
  *   value={password}
- *   onChange={setPassword}
+ *   onChange={(e) => setPassword(e.target.value)}
  *   placeholder="Tu contraseña"
  *   required
  * />
@@ -45,6 +40,7 @@ export function PasswordInput({
   disabled = false,
   minLength,
   className = "",
+  ...rest
 }: PasswordInputProps) {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -57,12 +53,13 @@ export function PasswordInput({
       <input
         type={showPassword ? "text" : "password"}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         placeholder={placeholder}
         required={required}
         disabled={disabled}
         minLength={minLength}
         className={`w-full rounded-md border border-slate-300 px-3 py-2 text-sm pr-10 ${className}`}
+        {...rest}
       />
       <button
         type="button"
