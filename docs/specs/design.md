@@ -118,6 +118,17 @@ Base: `/api`. Errores de validación → `422` (Pydantic). No encontrado → `40
 | POST   | /tickets/{id}/comentarios         | {autor, cuerpo}                | 201   |
 | POST   | /webhooks/tickets                 | payload firmado (X-Signature)  | 201   |
 | WS     | /ws/tickets                       | —                              | —     |
+| GET    | /users/options?q&limit            | — (auth)                       | 200   |
+
+### Asignación con autocompletado (detalle de ticket)
+
+- `GET /api/users/options` está disponible para **cualquier usuario
+  autenticado** (a diferencia del CRUD `/api/users`, que es solo-admin). Devuelve
+  únicamente `{id, email}` para poblar selects sin exponer datos sensibles.
+- Parámetros: `q` (filtra por email, case-insensitive) y `limit` (por defecto 5).
+  En el frontend, un componente propio `UserAutocomplete` (Tailwind, sin MUI)
+  muestra un buscador; la primera opción es "Asignarme a mí" (usuario actual).
+  Al elegir, hace `PATCH /api/tickets/{id}` con `asignado_a_id` y refresca.
 
 ### Esquemas Pydantic (v2)
 

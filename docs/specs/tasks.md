@@ -64,6 +64,18 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · *(bonus)* opcional.
 - [ ] `docs: add DECISIONES.md`
 - [ ] Verificación final: `docker compose up --build` y tests en verde.
 
+## Fase 9 — Ampliaciones posteriores (fuera del alcance original)
+
+Añadidas tras completar el núcleo, cada una con su spec (requisitos + diseño).
+
+- [x] Autenticación: usuarios (email/contraseña, `is_admin`), JWT, CRUD de
+  usuarios (solo admin), `asignado_a` como FK a usuario; login y gestión de
+  usuarios en el frontend.
+- [x] Tiempo real con Redis pub/sub.
+- [x] Pipeline de CI (lint + tests).
+- [ ] `feat(api): add GET /api/users/options for assignee autocomplete`
+- [ ] `feat(web): assignee autocomplete on ticket detail ("asignarme a mí" + search)`
+
 ---
 
 ## Priorización (si el tiempo se acorta)

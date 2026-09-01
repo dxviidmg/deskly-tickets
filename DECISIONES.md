@@ -342,3 +342,33 @@ comprueba los tipos. Verifiqué los cuatro pasos en local (23 tests, lint limpio
 ambos, build correcto). Nota honesta: el workflow no se ha ejecutado aún en
 GitHub Actions real porque no hay repositorio remoto en este entorno, pero cada
 paso usa los mismos comandos que probé.
+
+---
+
+### [Decisión] Asignación de ticket: endpoint de "opciones" y autocompletado propio
+
+**Contexto:** En el detalle del ticket quería un selector con búsqueda (estilo
+Autocomplete de MUI) para cambiar el usuario asignado, con "Asignarme a mí" como
+primera opción y mostrando los primeros 5 usuarios. Problema: el CRUD de usuarios
+(`GET /api/users`) es **solo para administradores**, así que un agente normal no
+podría llenar ese selector.
+
+**Uso de LLM:** Le pedí la funcionalidad y que resolviera cómo obtener la lista de
+usuarios para el selector sin abrir el CRUD de administración.
+
+**Salida del modelo:** Propuso dos caminos: (a) crear un endpoint ligero de
+"opciones" accesible a cualquier usuario autenticado que devuelva solo lo
+necesario, o (b) relajar el `GET /api/users` para todos.
+
+**Mi decisión:** Elegí la opción (a): un endpoint nuevo
+`GET /api/users/options?q=&limit=5` disponible para **cualquier usuario
+autenticado**, que devuelve **solo `id` y `email`** (sin exponer `is_admin` ni
+otros datos). El resto de la administración de usuarios sigue siendo solo-admin.
+La búsqueda es del lado del servidor (filtra por email, máximo 5). Sobre la UI:
+descarté instalar MUI (era solo una referencia) y construí un componente propio
+con Tailwind (`UserAutocomplete`), coherente con el resto de la interfaz y sin
+añadir dependencias. La primera opción es "Asignarme a mí" (usa el id del usuario
+en sesión); al elegir, hace `PATCH /api/tickets/{id}` con `asignado_a_id` y
+refresca sin recargar. Detalle técnico: registré el endpoint de opciones **antes**
+que el CRUD de usuarios para que la ruta `/api/users/options` no choque con
+`/api/users/{id}`. Seguí SDD: escribí requisitos y diseño antes de implementar.
