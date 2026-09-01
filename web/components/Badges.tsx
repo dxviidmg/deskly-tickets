@@ -15,8 +15,8 @@ const ESTADO_LABEL: Record<Estado, string> = {
 };
 
 const PRIORIDAD_STYLES: Record<Prioridad, string> = {
-  baja: "bg-slate-100 text-slate-700",
-  media: "bg-sky-100 text-sky-800",
+  baja: "bg-green-100 text-green-800",
+  media: "bg-yellow-100 text-yellow-800",
   alta: "bg-orange-100 text-orange-800",
   urgente: "bg-red-100 text-red-800",
 };
