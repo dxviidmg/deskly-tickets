@@ -129,8 +129,8 @@ function Dashboard() {
         <ConnectionIndicator status={status} />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
+      <div className="mb-4 grid grid-cols-3 gap-4">
+        <div className="flex flex-col gap-2">
           <label htmlFor="estado" className="text-sm text-slate-600">
             Filtrar por estado:
           </label>
@@ -141,7 +141,7 @@ function Dashboard() {
               setPage(1);
               setEstado(e.target.value as Estado | "");
             }}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
           >
             <option value="">Todos</option>
             {ESTADOS.map((e) => (
@@ -152,7 +152,7 @@ function Dashboard() {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2">
           <label htmlFor="prioridad" className="text-sm text-slate-600">
             Filtrar por prioridad:
           </label>
@@ -163,7 +163,7 @@ function Dashboard() {
               setPage(1);
               setPrioridad(e.target.value as Prioridad | "");
             }}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
           >
             <option value="">Todas</option>
             {PRIORIDADES.map((p) => (
@@ -174,7 +174,7 @@ function Dashboard() {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2">
           <label htmlFor="asignado" className="text-sm text-slate-600">
             Filtrar por asignado:
           </label>
@@ -191,7 +191,7 @@ function Dashboard() {
                 setAsignadoAId(Number(e.target.value));
               }
             }}
-            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
           >
             <option value="">Todos</option>
             <option value="-1">Sin asignar</option>
