@@ -24,6 +24,8 @@ function UsersAdmin() {
   // Create form
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [apellidos, setApellidos] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,9 +51,17 @@ function UsersAdmin() {
     setBusy(true);
     setFormError("");
     try {
-      await api.createUser(email.trim(), password, isAdmin);
+      await api.createUser({
+        email: email.trim(),
+        password,
+        nombre: nombre.trim(),
+        apellidos: apellidos.trim(),
+        is_admin: isAdmin,
+      });
       setEmail("");
       setPassword("");
+      setNombre("");
+      setApellidos("");
       setIsAdmin(false);
       await load();
     } catch (e) {
@@ -82,6 +92,22 @@ function UsersAdmin() {
       >
         <h2 className="text-sm font-medium text-slate-700">Crear usuario</h2>
         <div className="flex flex-wrap gap-3">
+          <input
+            type="text"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Nombre"
+            required
+            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+          <input
+            type="text"
+            value={apellidos}
+            onChange={(e) => setApellidos(e.target.value)}
+            placeholder="Apellidos"
+            required
+            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
           <input
             type="email"
             value={email}
@@ -132,6 +158,7 @@ function UsersAdmin() {
           <table className="w-full text-sm">
             <thead className="bg-slate-100 text-left text-slate-600">
               <tr>
+                <th className="px-4 py-2 font-medium">Nombre</th>
                 <th className="px-4 py-2 font-medium">Email</th>
                 <th className="px-4 py-2 font-medium">Rol</th>
                 <th className="px-4 py-2 font-medium"></th>
@@ -140,6 +167,7 @@ function UsersAdmin() {
             <tbody>
               {users.map((u) => (
                 <tr key={u.id} className="border-t">
+                  <td className="px-4 py-2">{u.nombre_completo}</td>
                   <td className="px-4 py-2">{u.email}</td>
                   <td className="px-4 py-2">
                     {u.is_admin ? "Administrador" : "Agente"}

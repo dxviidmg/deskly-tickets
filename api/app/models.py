@@ -23,11 +23,17 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    nombre: Mapped[str] = mapped_column(String(120), nullable=False)
+    apellidos: Mapped[str] = mapped_column(String(120), nullable=False)
     # Whether the user can manage (CRUD) other users.
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    @property
+    def nombre_completo(self) -> str:
+        return f"{self.nombre} {self.apellidos}"
 
 
 class Ticket(Base):

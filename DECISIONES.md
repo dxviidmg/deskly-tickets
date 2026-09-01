@@ -372,3 +372,35 @@ en sesión); al elegir, hace `PATCH /api/tickets/{id}` con `asignado_a_id` y
 refresca sin recargar. Detalle técnico: registré el endpoint de opciones **antes**
 que el CRUD de usuarios para que la ruta `/api/users/options` no choque con
 `/api/users/{id}`. Seguí SDD: escribí requisitos y diseño antes de implementar.
+
+---
+
+### [Decisión] Nombre y apellidos en usuarios; idioma del dominio en español
+
+**Contexto:** Los usuarios solo tenían email. Un ticket "asignado a" una persona
+debería mostrar su nombre, no solo el correo. Al añadir los campos noté además
+"spanglish" en el código: mezclaba nombres en español (los del enunciado:
+`titulo`, `estado`, `asignado_a`…) con inglés que yo había introducido
+(`full_name`).
+
+**Uso de LLM:** Le pedí añadir `nombre` y `apellidos` (obligatorios), un
+"nombre completo" y que la búsqueda de usuarios encontrara por email y por
+nombre/apellidos. También le pedí resolver la inconsistencia de idioma.
+
+**Salida del modelo:** Implementó los campos y propuso tres criterios de idioma:
+(A) todo el dominio en inglés (rompe el contrato del enunciado), (B) dominio en
+español como pide el enunciado y tecnicismos en inglés, (C) inglés solo en los
+campos nuevos.
+
+**Mi decisión:** Elegí **(B)**. El enunciado fija los campos del ticket en español
+(`titulo`, `descripcion`, `estado`, etc.), así que mantengo el **dominio en
+español** por coherencia con ese contrato y renombré lo que yo había puesto en
+inglés: `full_name → nombre_completo`. Dejo en inglés solo los **tecnicismos** que
+no son campos de negocio (`email`, `is_admin`, `hashed_password`), que es una
+convención habitual. `nombre` y `apellidos` son obligatorios; `nombre_completo`
+es una propiedad calculada (`"{nombre} {apellidos}"`). La búsqueda de
+`/api/users/options` filtra por email, nombre, apellidos y por la concatenación
+"nombre apellidos" (para que "victor hernandez" encuentre a Victor Hernandez), y
+el seed incluye a ese usuario de ejemplo. Al ser cambios de esquema en un
+prototipo, actualicé la **migración inicial** (en vez de una incremental), lo que
+obliga a recrear la base de datos en desarrollo.

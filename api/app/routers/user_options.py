@@ -25,7 +25,14 @@ async def user_options(
 ) -> list[User]:
     stmt = select(User)
     if q:
-        stmt = stmt.where(func.lower(User.email).like(f"%{q.lower()}%"))
-    stmt = stmt.order_by(User.email).limit(limit)
+        needle = f"%{q.lower()}%"
+        full = func.lower(User.nombre + " " + User.apellidos)
+        stmt = stmt.where(
+            func.lower(User.email).like(needle)
+            | func.lower(User.nombre).like(needle)
+            | func.lower(User.apellidos).like(needle)
+            | full.like(needle)
+        )
+    stmt = stmt.order_by(User.nombre, User.apellidos).limit(limit)
     result = await session.scalars(stmt)
     return list(result.all())

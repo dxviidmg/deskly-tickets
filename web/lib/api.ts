@@ -140,10 +140,16 @@ export const api = {
     params.set("limit", String(limit));
     return request<UserOption[]>(`/api/users/options?${params.toString()}`);
   },
-  createUser(email: string, password: string, is_admin: boolean): Promise<User> {
+  createUser(data: {
+    email: string;
+    password: string;
+    nombre: string;
+    apellidos: string;
+    is_admin: boolean;
+  }): Promise<User> {
     return request<User>("/api/users", {
       method: "POST",
-      body: JSON.stringify({ email, password, is_admin }),
+      body: JSON.stringify(data),
     });
   },
   deleteUser(id: number): Promise<void> {

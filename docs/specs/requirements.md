@@ -151,18 +151,24 @@ vista de detalle, buscándolo cómodamente, para reasignar el trabajo.
 Criterios de aceptación:
 
 1. Cuando un usuario autenticado solicita `GET /api/users/options`, el sistema
-   deberá devolver una lista reducida de usuarios (`id` y `email` únicamente),
-   accesible para cualquier usuario autenticado (no solo administradores).
-2. Cuando se envía el parámetro `q`, el sistema deberá filtrar por email
-   (sin distinción de mayúsculas) y devolver como máximo `limit` resultados
-   (por defecto 5). Sin `q`, deberá devolver los primeros `limit` usuarios.
-3. En el detalle `/tickets/[id]`, la UI deberá ofrecer un control de
+   deberá devolver una lista reducida de usuarios (`id`, `email` y
+   `nombre_completo`), accesible para cualquier usuario autenticado (no solo
+   administradores).
+2. Cuando se envía el parámetro `q`, el sistema deberá filtrar por **email,
+   nombre y apellidos** (sin distinción de mayúsculas), de modo que un texto como
+   "victor hernandez" encuentre al usuario cuyo nombre es "Victor" y apellidos
+   "Hernandez". Devolverá como máximo `limit` resultados (por defecto 5); sin `q`,
+   los primeros `limit`.
+3. Cada usuario tiene `nombre` y `apellidos` (obligatorios) y expone un
+   `nombre_completo` (`"{nombre} {apellidos}"`). La creación de usuarios exige ambos
+   campos.
+4. En el detalle `/tickets/[id]`, la UI deberá ofrecer un control de
    autocompletado (buscador + lista) para elegir el usuario asignado.
-4. La primera opción del control deberá ser **"Asignarme a mí"** (el usuario
+5. La primera opción del control deberá ser **"Asignarme a mí"** (el usuario
    autenticado actual).
-5. Al seleccionar un usuario, la UI deberá enviar `PATCH /api/tickets/{id}` con
+6. Al seleccionar un usuario, la UI deberá enviar `PATCH /api/tickets/{id}` con
    `asignado_a_id` y reflejar el cambio sin recargar la página.
-6. El control deberá mostrar por defecto hasta 5 usuarios y actualizar la lista
+7. El control deberá mostrar por defecto hasta 5 usuarios y actualizar la lista
    según el texto buscado.
 
 ---

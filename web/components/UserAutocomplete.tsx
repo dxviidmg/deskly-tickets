@@ -113,7 +113,10 @@ export function UserAutocomplete({ currentEmail, onSelect, disabled }: Props) {
                     onClick={() => choose(o.id)}
                     className="block w-full px-3 py-1.5 text-left hover:bg-slate-50"
                   >
-                    {o.email}
+                    <span className="font-medium">{o.nombre_completo}</span>
+                    <span className="ml-2 text-xs text-slate-400">
+                      {o.email}
+                    </span>
                   </button>
                 </li>
               ))}

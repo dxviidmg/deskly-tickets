@@ -38,9 +38,6 @@ export default async function TicketDetailPage({
           <p className="mt-3 whitespace-pre-wrap text-slate-700">
             {ticket.descripcion}
           </p>
-          <p className="mt-3 text-sm text-slate-500">
-            Asignado a: {ticket.asignado_a ?? "—"}
-          </p>
         </div>
 
         {/* Interactivity (transitions, comments, live updates) on the client. */}

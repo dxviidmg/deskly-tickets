@@ -102,12 +102,16 @@ class Token(BaseModel):
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
+    nombre: str = Field(min_length=1, max_length=120)
+    apellidos: str = Field(min_length=1, max_length=120)
     is_admin: bool = False
 
 
 class UserUpdate(BaseModel):
     email: EmailStr | None = None
     password: str | None = Field(default=None, min_length=6, max_length=128)
+    nombre: str | None = Field(default=None, min_length=1, max_length=120)
+    apellidos: str | None = Field(default=None, min_length=1, max_length=120)
     is_admin: bool | None = None
 
 
@@ -116,6 +120,9 @@ class UserOut(BaseModel):
 
     id: int
     email: EmailStr
+    nombre: str
+    apellidos: str
+    nombre_completo: str
     is_admin: bool
     creado_en: datetime
 
@@ -127,3 +134,4 @@ class UserOption(BaseModel):
 
     id: int
     email: EmailStr
+    nombre_completo: str

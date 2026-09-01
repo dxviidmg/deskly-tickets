@@ -18,6 +18,9 @@ export interface Ticket {
 export interface User {
   id: number;
   email: string;
+  nombre: string;
+  apellidos: string;
+  nombre_completo: string;
   is_admin: boolean;
   creado_en: string;
 }
@@ -25,6 +28,7 @@ export interface User {
 export interface UserOption {
   id: number;
   email: string;
+  nombre_completo: string;
 }
 
 export interface AuthUser {
