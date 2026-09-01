@@ -427,3 +427,78 @@ ya existían, más otros 7). Uno de los nuevos (`camila@deskly.com`) es admin pa
 tener más de un administrador de prueba. Los tickets de ejemplo se siguen
 asignando al primer agente (`agente@deskly.com`). El seed es idempotente, así que
 reiniciar el proyecto y volver a sembrar no duplica usuarios.
+
+### [Decisión] 100 tickets de ejemplo en el seed
+
+**Contexto:** Con solo 3 tickets no se podían probar bien la paginación ni los
+filtros por estado/prioridad. Se pidió sembrar 100 tickets variados.
+
+**Uso de LLM:** Le pedí generar 100 tickets con distintos estados y prioridades.
+
+**Salida del modelo:** Genera 100 tickets ciclando por `list(Estado)` y
+`list(Prioridad)` (así aparecen las 4 combinaciones de forma pareja), con
+asignaciones repartidas entre los 10 usuarios y "sin asignar", usando un
+`random.Random(42)` para que sea determinista.
+
+**Mi decisión:** Lo acepté. Los estados se fijan directamente en la creación (no
+vía la máquina de estados) para tener tickets ya en `resuelto`/`cerrado` con los
+que probar filtros y badges. Mantengo la guarda de idempotencia: solo siembra si
+la tabla de tickets está vacía, por lo que hay que recrear la BD para regenerar.
+
+### [Decisión] Colores de prioridad por severidad
+
+**Contexto:** La prioridad se distinguía poco visualmente. Se pidió color por
+prioridad.
+
+**Uso de LLM:** Le pedí rojo/naranja/amarillo y, al añadir `urgente`, colores
+coherentes para los cuatro niveles.
+
+**Salida del modelo:** Propuso una escala de severidad creciente:
+baja=verde, media=amarillo, alta=naranja, urgente=rojo.
+
+**Mi decisión:** Elegí la escala verde→amarillo→naranja→rojo. Con las cuatro
+prioridades del enum, cuatro colores distintos son más legibles que reutilizar
+rojo para alta y urgente. El cambio vive en un único sitio (`PrioridadBadge`), así
+que aplica igual en el listado y en el detalle.
+
+### [Decisión] Asignación inline y filtros en el listado
+
+**Contexto:** Para asignar un ticket había que entrar a su detalle. Se pidió
+poder asignar desde la tabla y filtrar también por prioridad, además de mostrar
+la antigüedad del ticket.
+
+**Uso de LLM:** Le pedí reutilizar el autocompletado de usuarios en la tabla, un
+filtro por prioridad y un "creado hace" en lenguaje natural.
+
+**Salida del modelo:** Reutilizó `UserAutocomplete` en cada fila (mismo endpoint
+`PATCH /api/tickets/{id}`), añadió el `select` de prioridad cableado al query
+param que ya soportaba el backend, y una utilidad `tiempoRelativo` en español.
+
+**Mi decisión:** Lo acepté. Reutilizar el mismo componente y endpoint evita
+duplicar lógica. Hice el ancho de `UserAutocomplete` configurable (`className`)
+para que encaje tanto en la tabla como en el detalle. El tiempo relativo se
+calcula en cliente (`lib/time.ts`) con escalas minuto→año y muestra la fecha
+exacta en el `title`. No añadí endpoints nuevos: el backend ya filtraba por
+prioridad y aceptaba `PATCH` parcial.
+
+### [Decisión] Detalle de ticket editable (estilo Jira) y reordenado
+
+**Contexto:** El detalle mostraba título y descripción como texto fijo, y el
+orden ponía el título arriba y los controles debajo. Se pidió edición inline y
+reorganizar para que estado, prioridad, transición y asignación queden juntos y
+arriba.
+
+**Uso de LLM:** Le pedí convertir título en `input` y descripción en `textarea`
+con guardado, y reordenar las secciones.
+
+**Salida del modelo:** Movió el bloque de controles encima del título; agrupó
+estado, prioridad, "Cambiar estado" y "Asignado a" como columnas de una misma
+tarjeta; e hizo el título/descripción editables con un botón "Guardar" que solo
+se habilita cuando hay cambios (`dirty`) y un "Cancelar" que revierte.
+
+**Mi decisión:** Lo acepté. El `PATCH /api/tickets/{id}` ya aceptaba `titulo` y
+`descripcion` en `TicketUpdate`, así que no toqué el backend: solo amplié el tipo
+del cliente. Para que el título/descripción reaccionen a cambios en vivo, el
+render pasó de SSR (en `page.tsx`) al componente cliente, que ya sincroniza el
+ticket por WebSocket. Límite conocido: un evento entrante puede sobrescribir
+ediciones locales sin guardar; aceptable en un prototipo.
