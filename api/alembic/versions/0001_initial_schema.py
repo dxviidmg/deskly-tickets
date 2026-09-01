@@ -1,0 +1,111 @@
+"""initial schema
+
+Revision ID: 0001_initial_schema
+Revises:
+Create Date: 2026-08-31 18:46:00.000000
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = "0001_initial_schema"
+down_revision: Union[str, None] = None
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "users",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("email", sa.String(length=255), nullable=False),
+        sa.Column("hashed_password", sa.String(length=255), nullable=False),
+        sa.Column("nombre", sa.String(length=120), nullable=False),
+        sa.Column("apellidos", sa.String(length=120), nullable=False),
+        sa.Column("is_admin", sa.Boolean(), nullable=False),
+        sa.Column(
+            "creado_en",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("email"),
+    )
+    op.create_table(
+        "tickets",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("titulo", sa.String(length=200), nullable=False),
+        sa.Column("descripcion", sa.Text(), nullable=False),
+        sa.Column("prioridad", sa.String(length=20), nullable=False),
+        sa.Column("estado", sa.String(length=20), nullable=False),
+        sa.Column("asignado_a_id", sa.Integer(), nullable=True),
+        sa.Column(
+            "creado_en",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
+        sa.Column(
+            "actualizado_en",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["asignado_a_id"], ["users.id"], ondelete="SET NULL"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        op.f("ix_tickets_asignado_a_id"), "tickets", ["asignado_a_id"], unique=False
+    )
+    op.create_index("ix_tickets_estado", "tickets", ["estado"], unique=False)
+    op.create_index("ix_tickets_prioridad", "tickets", ["prioridad"], unique=False)
+    op.create_table(
+        "comments",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("ticket_id", sa.Integer(), nullable=False),
+        sa.Column("autor", sa.String(length=120), nullable=False),
+        sa.Column("cuerpo", sa.Text(), nullable=False),
+        sa.Column(
+            "creado_en",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["ticket_id"], ["tickets.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        op.f("ix_comments_ticket_id"), "comments", ["ticket_id"], unique=False
+    )
+    op.create_table(
+        "webhook_events",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("event_id", sa.String(length=120), nullable=False),
+        sa.Column("ticket_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "procesado_en",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["ticket_id"], ["tickets.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("event_id"),
+    )
+
+
+def downgrade() -> None:
+    op.drop_table("webhook_events")
+    op.drop_index(op.f("ix_comments_ticket_id"), table_name="comments")
+    op.drop_table("comments")
+    op.drop_index("ix_tickets_prioridad", table_name="tickets")
+    op.drop_index("ix_tickets_estado", table_name="tickets")
+    op.drop_index(op.f("ix_tickets_asignado_a_id"), table_name="tickets")
+    op.drop_table("tickets")
+    op.drop_table("users")

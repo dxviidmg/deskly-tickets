@@ -404,3 +404,26 @@ es una propiedad calculada (`"{nombre} {apellidos}"`). La búsqueda de
 el seed incluye a ese usuario de ejemplo. Al ser cambios de esquema en un
 prototipo, actualicé la **migración inicial** (en vez de una incremental), lo que
 obliga a recrear la base de datos en desarrollo.
+
+### [Decisión] Reinicio de migraciones y seed con 10 usuarios
+
+**Contexto:** En desarrollo la base de datos se recrea entera, así que no tiene
+sentido arrastrar historial de migraciones incrementales. Se pidió reiniciar las
+migraciones y ampliar el seed a 10 usuarios.
+
+**Uso de LLM:** Le pedí consolidar el historial de Alembic en una única migración
+inicial limpia y actualizar el seed para crear 10 usuarios de ejemplo.
+
+**Salida del modelo:** Eliminó la migración previa (`347a30492066`) y creó una
+única migración inicial `0001_initial_schema` con `down_revision = None` (mismo
+esquema: users, tickets, comments, webhook_events e índices). Reescribió el seed
+con una lista `SAMPLE_USERS` idempotente (lookup por email antes de insertar).
+
+**Mi decisión:** Acepté el reinicio a una sola migración inicial: en un prototipo
+donde la DB se recrea, un historial plano es más simple de mantener. El seed
+siembra 10 usuarios en total: el admin de `settings` (`admin@deskly.com`) más 9
+entradas en `SAMPLE_USERS` (incluye `agente@deskly.com` y `victor@deskly.com` que
+ya existían, más otros 7). Uno de los nuevos (`camila@deskly.com`) es admin para
+tener más de un administrador de prueba. Los tickets de ejemplo se siguen
+asignando al primer agente (`agente@deskly.com`). El seed es idempotente, así que
+reiniciar el proyecto y volver a sembrar no duplica usuarios.
