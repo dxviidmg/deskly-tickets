@@ -87,7 +87,11 @@ async def list_tickets(
     if prioridad is not None:
         filters.append(Ticket.prioridad == prioridad)
     if asignado_a_id is not None:
-        filters.append(Ticket.asignado_a_id == asignado_a_id)
+        # -1 means "unassigned" (NULL); any other value is a user id
+        if asignado_a_id == -1:
+            filters.append(Ticket.asignado_a_id.is_(None))
+        else:
+            filters.append(Ticket.asignado_a_id == asignado_a_id)
 
     total_stmt = select(func.count()).select_from(Ticket)
     if filters:

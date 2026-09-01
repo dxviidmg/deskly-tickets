@@ -180,15 +180,21 @@ function Dashboard() {
           </label>
           <select
             id="asignado"
-            value={asignadoAId ?? ""}
+            value={asignadoAId === null ? "" : asignadoAId === -1 ? "-1" : asignadoAId}
             onChange={(e) => {
               setPage(1);
-              setAsignadoAId(e.target.value === "" ? null : Number(e.target.value));
+              if (e.target.value === "") {
+                setAsignadoAId(null);
+              } else if (e.target.value === "-1") {
+                setAsignadoAId(-1);
+              } else {
+                setAsignadoAId(Number(e.target.value));
+              }
             }}
             className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
           >
             <option value="">Todos</option>
-            <option value="0">Sin asignar</option>
+            <option value="-1">Sin asignar</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.nombre_completo} ({u.email})
