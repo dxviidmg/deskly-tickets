@@ -692,3 +692,27 @@ primero), cuando es más natural leer el historial del principio al final.
 
 **Mi decisión:** Implementé ambos cambios. Mejora UX: la fecha nunca queda oculta
 y el flujo temporal es intuitivo (inicio → fin del ciclo de vida del ticket).
+
+### [Decisión] Corrección de requirements.txt y Suspense boundary
+
+**Contexto:** Al intentar levantar el proyecto con Docker, el build fallaba porque
+`requirements.txt` contenía paquetes del sistema Ubuntu (aptdaemon, python-apt, etc.)
+que no son dependencias del proyecto. Además, el build del frontend fallaba por un
+prerender error en `/login` debido al uso de `useSearchParams()` sin Suspense boundary.
+
+**Uso de LLM:** Le pedí que diagnosticara los errores de build y reconstruyera las
+dependencias correctas a partir de los imports del código.
+
+**Salida del modelo:** Identificó las dependencias reales del proyecto (FastAPI,
+SQLAlchemy, Redis, Pydantic, etc.) y propuso un requirements.txt limpio. También
+detectó que `useSearchParams` requiere Suspense boundary en Next.js 14.
+
+**Mi decisión:**
+1. Sobrescribí `requirements.txt` con las dependencias correctas del proyecto,
+   eliminando los paquetes de sistema que habían contaminado el archivo.
+2. Añadí `python-jose[cryptography]` para JWT (el código importa de `jose`, no de
+   `jwt`) y `email-validator` para validación de emails en Pydantic.
+3. Envolví el componente de login en un Suspense boundary para cumplir con los
+   requisitos de Next.js 14 con `useSearchParams`.
+
+Commits atómicos: uno para requirements.txt, otro para Suspense boundary.
