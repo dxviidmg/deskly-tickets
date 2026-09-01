@@ -18,6 +18,8 @@ yarn-error.log*
 # Env / secrets
 .env
 *.env
+.env.local
+**/.env.local
 !.env.example
 
 # OS / editor
