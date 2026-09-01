@@ -91,6 +91,16 @@ Nota de implementación: en esta entrega el mensaje de estado se registra como
 "Cambio de status: [estado nuevo]" (sin el estado anterior) y `usuario_id` puede
 quedar `null`, porque los listeners de SQLAlchemy no tienen acceso al usuario
 autenticado del request. Atribuir el actor queda como paso siguiente.
+
+Nota sobre el seed de ejemplo: los tickets sembrados al arrancar no aparecen ya en
+su estado final "de la nada", sino que **recorren su ciclo de vida** desde
+`abierto` hasta su estado objetivo. Por cada cambio de estado el seed inserta un
+registro en `state_log` ("Cambio de status: [estado nuevo]") y un `comment` que
+narra el mismo cambio, de modo que el historial y el hilo de comentarios sean
+coherentes con lo que produciría el uso real de la API. Los timestamps de esos
+registros se escalonan **un minuto** entre cada cambio (partiendo de la creación
+del ticket), para que el historial quede ordenado cronológicamente de forma
+realista.
 - `en_progreso → resuelto`
 - `resuelto → cerrado`
 - `resuelto → abierto` (reabierto)

@@ -200,6 +200,28 @@ CREATE TABLE state_log (
 
 El endpoint `GET /api/tickets/{id}` incluye `state_log` como array de objetos `{ id, mensaje, usuario_id, creado_en }`, ordenado por `creado_en DESC`.
 
+### 8.1 Seed con historial coherente
+
+El seed de arranque (`app/bootstrap.py`) no crea los tickets directamente en su
+estado final: los hace **recorrer su ciclo de vida** hasta el estado objetivo,
+siguiendo la máquina de estados (`abierto → en_progreso → resuelto →
+cerrado`, con `resuelto → abierto` para reabrir). Por cada paso de la ruta:
+
+- inserta un `state_log` con `mensaje = "Cambio de status: {estado nuevo}"`
+  (mismo formato que producen los listeners en runtime), y
+- inserta un `comment` que narra el mismo cambio (autor = usuario asignado o un
+  autor de sistema si el ticket está sin asignar).
+
+Los `creado_en` de ticket, logs y comentarios se **escalonan un minuto** por cada
+cambio, empezando en un instante base por ticket, de forma que el historial quede
+ordenado cronológicamente como si lo hubiera generado el uso real de la API.
+
+Para controlar los timestamps con precisión y no depender de los listeners de
+SQLAlchemy (que fijan `creado_en = now()` en cada `after_insert`/`after_update`),
+el seed inserta ticket, `state_log` y `comment` con sentencias **Core**
+(`insert(...)`), que no disparan los event listeners del ORM. El log de creación
+inicial ("Cambio de status: abierto") lo emite explícitamente el propio seed.
+
 ## 9. Frontend
 
 - `/` (dashboard): Server Component que hace fetch inicial paginado; filtro por
