@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
+import { PasswordInput } from "@/components/PasswordInput";
 import { ApiError } from "@/lib/api";
 
 export default function LoginPage() {
@@ -61,12 +62,11 @@ export default function LoginPage() {
           <label className="mb-1 block text-sm text-slate-600">
             Contraseña
           </label>
-          <input
-            type="password"
+          <PasswordInput
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={setPassword}
+            placeholder="Contraseña"
             required
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
         {error && (

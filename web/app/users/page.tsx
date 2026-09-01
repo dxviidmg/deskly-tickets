@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { User } from "@/lib/types";
 import { RequireAuth } from "@/components/RequireAuth";
+import { PasswordInput } from "@/components/PasswordInput";
 import { TableSkeleton, EmptyState, ErrorState } from "@/components/UiStates";
 
 export default function UsersPage() {
@@ -116,15 +117,16 @@ function UsersAdmin() {
             required
             className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Contraseña (mín. 6)"
-            required
-            minLength={6}
-            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
+          <div className="flex-1">
+            <PasswordInput
+              value={password}
+              onChange={setPassword}
+              placeholder="Contraseña (mín. 6)"
+              required
+              minLength={6}
+              className="flex-1"
+            />
+          </div>
           <label className="flex items-center gap-1 text-sm text-slate-600">
             <input
               type="checkbox"
