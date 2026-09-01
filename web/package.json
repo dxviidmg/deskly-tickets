@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "types:gen": "openapi-typescript http://localhost:8000/openapi.json -o lib/api-types.ts"
   },
   "dependencies": {
     "next": "^14.2.35",
@@ -20,6 +21,7 @@
     "autoprefixer": "10.4.19",
     "eslint": "8.57.1",
     "eslint-config-next": "14.2.35",
+    "openapi-typescript": "^7.0.0",
     "postcss": "^8.5.26",
     "tailwindcss": "3.4.6",
     "typescript": "5.5.3"

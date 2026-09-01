@@ -747,6 +747,50 @@ etc. El router se reduce a orchestar la llamada y el broadcast WebSocket.
 El repositorio se inyecta via `Depends(get_repo)`, siguiendo el patrón de
 dependencias de FastAPI.
 
+### [Decisión] Environment validation con `extra="forbid"`
+
+**Contexto:** Las variables de entorno se aceptaban sin validación. Un typo en
+`.env` (ej: `DATABSE_URL` en lugar de `DATABASE_URL`) fallaba silenciosamente
+usando el valor por defecto.
+
+**Uso de LLM:** Propuse cambiar `extra="ignore"` a `extra="forbid"` en Pydantic
+Settings.
+
+**Salida del modelo:** Rechazar variables desconocidas obliga a documentar todas
+las vars y detecta typos al arrancar.
+
+**Mi decisión:** Acepté. Ahora si hay una variable no definida en `Settings`,
+la app falla al arrancar con un error claro. Beneficio: fail-fast, sin
+comportamiento sorpresivo en producción.
+
+### [Decisión] Migrations check en CI
+
+**Contexto:** No había validación automática de que las migraciones Alembic son
+consistentes con el modelo.
+
+**Uso de LLM:** Propuse añadir `alembic check` al pipeline de CI.
+
+**Salida del modelo:** El comando detecta drift entre modelos y migraciones,
+y conflictos en migraciones pendientes.
+
+**Mi decisión:** Acepté. Añadí el paso antes de los tests. Beneficio: detecta
+problemas de esquema antes del merge, no en producción.
+
+### [Decisión] Type-safety end-to-end con OpenAPI
+
+**Contexto:** Los tipos TypeScript en `lib/types.ts` se escribían a mano y
+podían desincronizarse del backend.
+
+**Uso de LLM:** Propuse generar tipos automáticamente desde el schema OpenAPI
+de FastAPI.
+
+**Salida del modelo:** Usar `openapi-typescript` para generar `lib/api-types.ts`
+desde `/openapi.json`, con un script `npm run types:gen`.
+
+**Mi decisión:** Acepté. Añadí el script y la dependencia. Beneficio: tipos
+siempre sincronizados, sin mantenimiento manual. Se puede integrar en CI o
+ejecutar manualmente cuando cambie la API.
+
 ### [Decisión] Corrección de requirements.txt y Suspense boundary
 
 **Contexto:** Al intentar levantar el proyecto con Docker, el build fallaba porque
