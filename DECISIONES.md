@@ -502,3 +502,68 @@ del cliente. Para que el título/descripción reaccionen a cambios en vivo, el
 render pasó de SSR (en `page.tsx`) al componente cliente, que ya sincroniza el
 ticket por WebSocket. Límite conocido: un evento entrante puede sobrescribir
 ediciones locales sin guardar; aceptable en un prototipo.
+
+### [Decisión] Estado reabierto en la máquina de estados
+
+**Contexto:** Se pidió agregar un estado "reabierto" como alternativa desde
+"resuelto", permitiendo volver a trabajar en un ticket cerrado si se descubre un
+problema.
+
+**Uso de LLM:** Le pedí implementar el estado reabierto en la máquina de estados
+y en el frontend.
+
+**Salida del modelo:** Agregó `reabierto` al enum `Estado`, actualizó
+`TRANSICIONES_VALIDAS` con `resuelto → reabierto` y `reabierto → en_progreso`,
+y actualizó etiquetas/colores en frontend.
+
+**Mi decisión:** Lo acepté. La lógica es clara: un ticket resuelto puede
+reabrirse si se encuentra un problema, y desde reabierto vuelve a estar en
+progreso. Color naranja para diferenciarlo visualmente de resuelto (verde).
+
+### [Decisión] Modal de transición con comentario (estilo Jira)
+
+**Contexto:** Los cambios de estado eran instantáneos sin contexto. Se pidió un
+modal que pida un comentario explicativo antes de aplicar la transición.
+
+**Uso de LLM:** Le pedí implementar un modal que capture comentarios opcionales y
+los agregue automáticamente con contexto del cambio.
+
+**Salida del modelo:** Modal con transición visual (estado anterior → nuevo),
+textarea para comentario opcional, botones Confirmar/Cancelar. Al confirmar,
+aplica transición y agrega comentario con contexto del cambio (ej.
+"Estado: Abierto → En progreso\n<usuario comment>").
+
+**Mi decisión:** Acepté. Comentarios opcionales (no obligatorios) para no
+bloquear, pero con contexto automático del cambio para trazabilidad. Las dos
+llamadas (transición + comentario) son independientes; una falla no bloquea la
+otra (límite conocido de idempotencia, aceptable en prototipo).
+
+### [Decisión] Manejo de sesión caducada (401 Unauthorized)
+
+**Contexto:** Cuando un token expiraba, los errores eran genéricos. Se pidió
+redirigir a login con un mensaje claro "Sesión caducada".
+
+**Uso de LLM:** Le pedí implementar detección de 401 y redirección con mensaje.
+
+**Salida del modelo:** `AuthProvider` detecta 401 en `api.me()`, marca
+`sessionExpired=true`. `RequireAuth` redirige a `/login?reason=session_expired`.
+Login muestra el mensaje específico.
+
+**Mi decisión:** Lo acepté. Diferencia clara entre "credenciales inválidas" (fallo
+de login) y "sesión caducada" (token expirado durante la sesión). Mejora UX.
+
+### [Decisión] Filtro por usuario asignado en el listado
+
+**Contexto:** El listado tenía filtros por estado/prioridad pero no por usuario
+asignado. Se pidió filtrar por asignado.
+
+**Uso de LLM:** Le pedí agregar el filtro al backend y un select dinámico en
+frontend.
+
+**Salida del modelo:** Backend: parámetro `asignado_a_id` en GET /api/tickets.
+Frontend: carga lista de usuarios al montar, renderiza select con opciones
+"Todos"/"Sin asignar"/[usuarios]. Muestra nombre_completo + email.
+
+**Mi decisión:** Acepté. Select en lugar de autocomplete (como estado/prioridad)
+para consistencia UI. Limit=50 (máximo del backend, no 100). Carga una sola vez
+al montar la página.
