@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { PasswordInput } from "@/components/PasswordInput";
 import { ApiError } from "@/lib/api";
 
-export default function LoginPage() {
+function LoginForm() {
   const { login, clearSessionExpired } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -83,5 +83,19 @@ export default function LoginPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-sm">
+          <p className="text-slate-500">Cargando…</p>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
