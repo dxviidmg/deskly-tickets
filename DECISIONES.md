@@ -259,6 +259,17 @@ ejecutar los tests, y tras fijarlo la suite pasa completa (21 tests). Lo dejo
 documentado para que quien mantenga el proyecto sepa por qué esa versión está
 clavada.
 
+**Actualización (reaparición en runtime):** El problema volvió a aparecer al
+levantar el stack con Docker: el login devolvía **500** con el mismo
+`ValueError: password cannot be longer than 72 bytes`. La causa fue que el pin
+estaba en un comentario/nota pero **no en una línea efectiva** de
+`requirements.txt`, así que `pip` instaló `bcrypt 5.0.0` (la última), de nuevo
+incompatible con passlib 1.7.4. La solución fue añadir la línea real
+`bcrypt==4.0.1` a `requirements.txt` (además de `passlib[bcrypt]==1.7.4`) y
+reconstruir la imagen. Confirmado: `pip show bcrypt` reporta `4.0.1` y el login
+responde 200 con `access_token`. Aprendizaje: un pin transitivo hay que fijarlo
+como dependencia directa explícita, no confiar en el extra `passlib[bcrypt]`.
+
 ---
 
 ### [Decisión] Frontend: token en cookie para que el SSR también esté autenticado
@@ -916,3 +927,81 @@ y si el ticket actualizado ya no matchea los filtros activos, se elimina de
 la lista. Añadí una animación CSS (`ticket-row-flash`) que pinta la fila de
 azul brevemente, con soporte para `prefers-reduced-motion`. Mejora UX sin
 añadir dependencias.
+
+---
+
+### [Decisión] Dos modos de arranque: Docker completo (Modo A) y desarrollo híbrido (Modo B)
+
+**Contexto:** La prueba pide arrancar todo con `docker compose up` (Modo A). Pero
+para desarrollar cómodamente quiero editar backend y frontend con recarga en vivo
+sin reconstruir imágenes en cada cambio (Modo B). El conflicto real no era el
+puerto (siempre 5432), sino el **host** de la base de datos: dentro de Docker el
+backend se conecta al servicio `db`, pero en local se conecta a `localhost`.
+Tener `DATABASE_URL` fija en el `.env` compartido rompía uno de los dos modos
+(de hecho, causaba el `ConnectionRefusedError` inicial: `localhost` dentro del
+contenedor apunta al propio contenedor, no a la db).
+
+**Uso de LLM:** Le pedí un diseño que soportara ambos modos sin editar archivos a mano cada vez.
+
+**Salida del modelo:** Propuso sacar `DATABASE_URL`/`REDIS_URL` del `.env`
+compartido para que cada modo aporte su propio host, y verificó que sin esas
+variables `pydantic` aplica el default del código (`@db:5432`), correcto para Docker.
+
+**Mi decisión:** Adopté ese enfoque. En el `.env` dejé `DATABASE_URL` y
+`REDIS_URL` **comentadas** (con una nota que explica por qué). Así:
+- **Modo A (Docker):** el contenedor `api` usa el default `@db:5432` del
+  `docker-compose.yml`. Es lo que ejecuta el evaluador con `docker compose up`.
+- **Modo B (local):** tres scripts (`dev-infra.sh`, `dev-api.sh`, `dev-web.sh`)
+  levantan Postgres+Redis en Docker y arrancan backend y frontend en local con
+  hot reload. `dev-api.sh` carga `api/.env.local` (host `localhost:5432`) antes
+  de uvicorn.
+
+`api/.env.local` está en `.gitignore`, así que el Modo B no interfiere con la
+entrega (Modo A). El puerto es 5432 en ambos casos; lo único que cambia es el host.
+
+---
+
+### [Decisión] Bug en el login: `PasswordInput` no reenviaba el `ref` a react-hook-form
+
+**Contexto:** El formulario de login mostraba "Invalid input: expected string,
+received undefined" bajo el campo de contraseña. El schema Zod y el backend
+estaban bien; el email validaba correctamente pero la contraseña no.
+
+**Uso de LLM:** Le pedí que diagnosticara por qué solo fallaba la contraseña.
+
+**Salida del modelo:** Identificó que `PasswordInput` era una función-componente
+normal (sin `forwardRef`) que además interceptaba `value`/`onChange`. Al hacer
+`<PasswordInput {...register("password")} />`, el `ref` que react-hook-form usa
+para leer el valor del input (modo no controlado) nunca llegaba al `<input>`, así
+que el valor llegaba como `undefined` y Zod fallaba. El email funcionaba porque
+usa `<input {...register("email")} />` directo.
+
+**Mi decisión:** Reescribí `PasswordInput` con **`forwardRef`**, reenviando el
+`ref` al `<input>` real y dejando que `name`/`onChange`/`onBlur`/`value` fluyan
+por `...rest`. Así es compatible tanto con react-hook-form (login, no controlado)
+como con uso controlado (`users/page.tsx`, con `value`/`onChange`). Verificado con
+`npx tsc --noEmit` (sin errores) y probando el login end-to-end.
+
+---
+
+### [Decisión] Bug en la transición de estado: `History` no tiene atributo `.modified`
+
+**Contexto:** Al cambiar el estado de un ticket, el endpoint de transición
+devolvía **500** con `AttributeError: 'History' object has no attribute 'modified'`
+en el listener `receive_ticket_after_update` de `app/events.py`.
+
+**Uso de LLM:** Le pedí que localizara la causa del `AttributeError`.
+
+**Salida del modelo:** El listener comprobaba
+`if estado_history.has_changes() and estado_history.modified:`, pero el objeto
+`History` que devuelve `get_history()` de SQLAlchemy solo expone `added`,
+`deleted`, `unchanged` y el método `has_changes()`. `.modified` no existe (el
+comentario del código incluso lo describía mal). El bloque análogo para
+`asignado_a_id`, unas líneas más abajo, ya usaba solo `has_changes()`
+correctamente.
+
+**Mi decisión:** Eliminé el `and estado_history.modified` y dejé la condición como
+`if estado_history.has_changes():`, que es lo que se pretendía y es consistente
+con el resto del listener. Actualicé el comentario para dejar claro qué atributos
+tiene realmente `History`. Verifiqué con grep que no había otros usos de
+`.modified` en el backend.
