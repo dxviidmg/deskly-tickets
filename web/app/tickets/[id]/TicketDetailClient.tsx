@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { Estado, TicketDetail, TicketEvent } from "@/lib/types";
 import { TRANSICIONES_VALIDAS } from "@/lib/types";
-import { EstadoBadge } from "@/components/Badges";
+import { EstadoBadge, PrioridadBadge } from "@/components/Badges";
 import { ConnectionIndicator } from "@/components/ConnectionIndicator";
 import { UserAutocomplete } from "@/components/UserAutocomplete";
 import { useTicketStream } from "@/hooks/useTicketStream";
@@ -21,8 +21,23 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // Inline edit (Jira-style) for title and description.
+  const [titulo, setTitulo] = useState(initial.titulo);
+  const [descripcion, setDescripcion] = useState(initial.descripcion);
+
   // Comment form
   const [cuerpo, setCuerpo] = useState("");
+
+  // Keep the editable fields in sync when the ticket is refreshed (e.g. via
+  // WebSocket) — unless the user has unsaved local edits.
+  useEffect(() => {
+    setTitulo(ticket.titulo);
+    setDescripcion(ticket.descripcion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticket.titulo, ticket.descripcion]);
+
+  const dirty =
+    titulo.trim() !== ticket.titulo || descripcion.trim() !== ticket.descripcion;
 
   const refresh = useCallback(async () => {
     try {
@@ -32,6 +47,26 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
       // keep current state on refresh error
     }
   }, [initial.id]);
+
+  const saveDetails = async () => {
+    if (!titulo.trim() || !descripcion.trim()) {
+      setError("El título y la descripción no pueden estar vacíos");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await api.updateTicket(ticket.id, {
+        titulo: titulo.trim(),
+        descripcion: descripcion.trim(),
+      });
+      await refresh();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo guardar el ticket");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Live updates: react only to events for this ticket.
   const onEvent = useCallback(
@@ -88,46 +123,61 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          Estado actual: <EstadoBadge estado={ticket.estado} />
-        </div>
+      <div className="flex items-center justify-end">
         <ConnectionIndicator status={status} />
       </div>
 
-      {/* Transition buttons */}
+      {/* Estado, prioridad, transición y asignación en una fila (columnas). */}
       <div className="rounded-lg border bg-white p-4">
-        <h2 className="mb-2 text-sm font-medium text-slate-700">
-          Cambiar estado
-        </h2>
-        {posibles.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            No hay transiciones disponibles desde este estado.
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {posibles.map((nuevo) => (
-              <button
-                key={nuevo}
-                disabled={busy}
-                onClick={() => doTransition(nuevo)}
-                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {ESTADO_LABEL[nuevo]}
-              </button>
-            ))}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <h2 className="mb-2 text-sm font-medium text-slate-700">Estado</h2>
+            <EstadoBadge estado={ticket.estado} />
           </div>
-        )}
-      </div>
 
-      {/* Assignee */}
-      <div className="rounded-lg border bg-white p-4">
-        <h2 className="mb-2 text-sm font-medium text-slate-700">Asignado a</h2>
-        <UserAutocomplete
-          currentEmail={ticket.asignado_a}
-          onSelect={assignUser}
-          disabled={busy}
-        />
+          <div>
+            <h2 className="mb-2 text-sm font-medium text-slate-700">
+              Prioridad
+            </h2>
+            <PrioridadBadge prioridad={ticket.prioridad} />
+          </div>
+
+          <div className="lg:border-l lg:border-slate-100 lg:pl-4">
+            <h2 className="mb-2 text-sm font-medium text-slate-700">
+              Cambiar estado
+            </h2>
+            {posibles.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                No hay transiciones disponibles.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {posibles.map((nuevo) => (
+                  <button
+                    key={nuevo}
+                    disabled={busy}
+                    onClick={() => doTransition(nuevo)}
+                    className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {ESTADO_LABEL[nuevo]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="lg:border-l lg:border-slate-100 lg:pl-4">
+            <h2 className="mb-2 text-sm font-medium text-slate-700">
+              Asignado a
+            </h2>
+            <UserAutocomplete
+              currentEmail={ticket.asignado_a}
+              onSelect={assignUser}
+              disabled={busy}
+              className="w-full"
+            />
+          </div>
+        </div>
       </div>
 
       {error && (
@@ -135,6 +185,52 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
           {error}
         </p>
       )}
+
+      {/* Título y descripción editables (estilo Jira). */}
+      <div className="rounded-lg border bg-white p-5">
+        <input
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value)}
+          disabled={busy}
+          maxLength={200}
+          placeholder="Título del ticket"
+          className="w-full rounded-md border border-transparent px-2 py-1 text-xl font-semibold hover:border-slate-200 focus:border-slate-300 focus:outline-none disabled:opacity-50"
+        />
+
+        <textarea
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          disabled={busy}
+          rows={4}
+          placeholder="Descripción del ticket"
+          className="mt-3 w-full resize-y rounded-md border border-transparent px-2 py-1 text-slate-700 hover:border-slate-200 focus:border-slate-300 focus:outline-none disabled:opacity-50"
+        />
+
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={saveDetails}
+            disabled={busy || !dirty}
+            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Guardar cambios
+          </button>
+          {dirty && (
+            <button
+              type="button"
+              onClick={() => {
+                setTitulo(ticket.titulo);
+                setDescripcion(ticket.descripcion);
+                setError("");
+              }}
+              disabled={busy}
+              className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Comments */}
       <div className="rounded-lg border bg-white p-4">

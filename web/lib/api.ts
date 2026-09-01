@@ -118,7 +118,14 @@ export const api = {
       body: JSON.stringify({ nuevo_estado }),
     });
   },
-  updateTicket(id: number, patch: { asignado_a_id?: number | null }): Promise<Ticket> {
+  updateTicket(
+    id: number,
+    patch: {
+      asignado_a_id?: number | null;
+      titulo?: string;
+      descripcion?: string;
+    }
+  ): Promise<Ticket> {
     return request<Ticket>(`/api/tickets/${id}`, {
       method: "PATCH",
       body: JSON.stringify(patch),

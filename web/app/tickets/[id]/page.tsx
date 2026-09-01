@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { api, ApiError, TOKEN_COOKIE } from "@/lib/api";
-import { EstadoBadge, PrioridadBadge } from "@/components/Badges";
 import { TicketDetailClient } from "./TicketDetailClient";
 
 // Server Component: fetches the ticket on the server (SSR) so the first paint
@@ -27,20 +26,8 @@ export default async function TicketDetailPage({
           ← Volver al listado
         </Link>
 
-        <div className="mt-3 rounded-lg border bg-white p-5">
-          <div className="flex items-start justify-between">
-            <h1 className="text-xl font-semibold">{ticket.titulo}</h1>
-            <div className="flex gap-2">
-              <EstadoBadge estado={ticket.estado} />
-              <PrioridadBadge prioridad={ticket.prioridad} />
-            </div>
-          </div>
-          <p className="mt-3 whitespace-pre-wrap text-slate-700">
-            {ticket.descripcion}
-          </p>
-        </div>
-
-        {/* Interactivity (transitions, comments, live updates) on the client. */}
+        {/* Order, transitions, comments and live updates on the client.
+            The status/assignee section renders above the title/description. */}
         <TicketDetailClient initial={ticket} />
       </div>
     );
