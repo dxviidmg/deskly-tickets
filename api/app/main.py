@@ -62,7 +62,35 @@ async def invalid_transition_handler(
 
 @app.get("/health", tags=["health"])
 async def health() -> dict[str, str]:
-    return {"status": "ok"}
+    """Extended health check verifying database and Redis connectivity."""
+    from sqlalchemy import text
+
+    from app.db import engine
+
+    health_status = {"status": "ok"}
+
+    # Check database
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        health_status["db"] = "ok"
+    except Exception:
+        health_status["db"] = "error"
+        health_status["status"] = "degraded"
+
+    # Check Redis (via WebSocket manager)
+    if manager._redis is not None:
+        try:
+            await manager._redis.ping()
+            health_status["redis"] = "ok"
+        except Exception:
+            health_status["redis"] = "error"
+            health_status["status"] = "degraded"
+    else:
+        # Redis is optional (local-only mode)
+        health_status["redis"] = "not_configured"
+
+    return health_status
 
 
 app.include_router(auth.router)

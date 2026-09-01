@@ -693,6 +693,60 @@ primero), cuando es más natural leer el historial del principio al final.
 **Mi decisión:** Implementé ambos cambios. Mejora UX: la fecha nunca queda oculta
 y el flujo temporal es intuitivo (inicio → fin del ciclo de vida del ticket).
 
+### [Decisión] Eventos de dominio tipados con StrEnum
+
+**Contexto:** Los eventos WebSocket se definían como strings literales sueltos
+(`TICKET_CREATED = "ticket.creado"`), propensos a typos y sin autocompletado.
+
+**Uso de LLM:** Propuso usar `StrEnum` de Python para type-safety.
+
+**Salida del modelo:** Crear `DomainEvent` como StrEnum con los tres eventos,
+re-exportando las constantes para mantener compatibilidad con imports existentes.
+
+**Mi decisión:** Acepté. Añadí `DomainEvent` a `enums.py` y refactoricé `events.py`
+para usar el enum. Mantuve las constantes exportadas para no romper los routers
+que las importan. Beneficio: type-safety, autocompletado en IDEs, single source
+of truth para los nombres de eventos.
+
+### [Decisión] Health check extendido con verificación de dependencias
+
+**Contexto:** El endpoint `/health` solo devolvía `{"status": "ok"}` sin verificar
+que la base de datos o Redis estuvieran accesibles.
+
+**Uso de LLM:** Propuso verificar conectividad de DB y Redis en el health check.
+
+**Salida del modelo:** Ejecutar `SELECT 1` contra la base de datos y `PING` contra
+Redis, devolviendo estado detallado por componente.
+
+**Mi decisión:** Acepté. El health check ahora devuelve:
+- `{"status": "ok", "db": "ok", "redis": "ok"}` si todo funciona
+- `{"status": "degraded", "db": "error", ...}` si algo falla
+- `redis: "not_configured"` si Redis no está configurado (es opcional)
+
+Esto permite detectar problemas de infraestructura antes de que afecten a usuarios.
+
+### [Decisión] Repository Pattern para desacoplar lógica de negocio
+
+**Contexto:** El router `tickets.py` tenía 185 LOC con lógica de negocio mezclada:
+validación de asignatario, filtros, paginación, transiciones de estado. Difícil
+de testear y reutilizar.
+
+**Uso de LLM:** Propuso extraer la lógica a una clase `TicketRepository` siguiendo
+el patrón Repository.
+
+**Salida del modelo:** Crear `app/repositories/ticket.py` con métodos para cada
+operación: `create`, `update`, `transition`, `add_comment`, `list_with_filters`,
+etc. El router se reduce a orchestar la llamada y el broadcast WebSocket.
+
+**Mi decisión:** Acepté. El router pasó de 185 LOC a 111 LOC. Beneficios:
+- Lógica de negocio testeable independientemente (unit tests del repositorio)
+- Reutilizable en otros contextos (CLI, background tasks, otros routers)
+- Router delgado que solo maneja HTTP y eventos
+- Separación clara de responsabilidades (SRP)
+
+El repositorio se inyecta via `Depends(get_repo)`, siguiendo el patrón de
+dependencias de FastAPI.
+
 ### [Decisión] Corrección de requirements.txt y Suspense boundary
 
 **Contexto:** Al intentar levantar el proyecto con Docker, el build fallaba porque

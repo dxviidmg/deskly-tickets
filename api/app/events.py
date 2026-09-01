@@ -1,16 +1,17 @@
-"""WebSocket event type constants and SQLAlchemy listeners for state_log."""
+"""SQLAlchemy listeners for state_log and WebSocket event broadcasting."""
 from datetime import datetime
 
 from sqlalchemy import event, insert
 from sqlalchemy.orm import object_session
 from sqlalchemy.orm.attributes import get_history
 
+from app.enums import DomainEvent
 from app.models import StateLog, Ticket, User
 
-# WebSocket event type constants (broadcast via Redis pub/sub).
-TICKET_CREATED = "ticket.creado"
-TICKET_UPDATED = "ticket.actualizado"
-TICKET_COMMENTED = "ticket.comentado"
+# Re-export for backward compatibility (routers import from here)
+TICKET_CREATED = DomainEvent.TICKET_CREATED
+TICKET_UPDATED = DomainEvent.TICKET_UPDATED
+TICKET_COMMENTED = DomainEvent.TICKET_COMMENTED
 
 
 @event.listens_for(Ticket, "after_insert", propagate=True)

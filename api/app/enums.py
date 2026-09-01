@@ -1,5 +1,5 @@
 """Domain enumerations for tickets."""
-from enum import Enum
+from enum import Enum, StrEnum
 
 
 class Estado(str, Enum):
@@ -19,3 +19,11 @@ class Prioridad(str, Enum):
     media = "media"
     alta = "alta"
     urgente = "urgente"
+
+
+class DomainEvent(StrEnum):
+    """WebSocket event types broadcast via Redis pub/sub."""
+
+    TICKET_CREATED = "ticket.creado"
+    TICKET_UPDATED = "ticket.actualizado"
+    TICKET_COMMENTED = "ticket.comentado"
