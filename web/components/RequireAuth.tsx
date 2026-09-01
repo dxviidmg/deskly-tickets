@@ -15,17 +15,19 @@ export function RequireAuth({
   children: React.ReactNode;
   adminOnly?: boolean;
 }) {
-  const { user, loading } = useAuth();
+  const { user, loading, sessionExpired } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      router.replace("/login");
+      // Si la sesión expiró, redirige a login con un parámetro para mostrar el aviso
+      const redirectTo = sessionExpired ? "/login?reason=session_expired" : "/login";
+      router.replace(redirectTo);
     } else if (adminOnly && !user.is_admin) {
       router.replace("/");
     }
-  }, [loading, user, adminOnly, router]);
+  }, [loading, user, adminOnly, router, sessionExpired]);
 
   if (loading) {
     return <p className="text-sm text-slate-500">Cargando…</p>;

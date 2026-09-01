@@ -1,17 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { ApiError } from "@/lib/api";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, clearSessionExpired } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Si viene reason=session_expired, mostrar aviso
+  useEffect(() => {
+    if (searchParams.get("reason") === "session_expired") {
+      setError("Sesión caducada. Inicia de nuevo sesión.");
+      clearSessionExpired();
+    }
+  }, [searchParams, clearSessionExpired]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

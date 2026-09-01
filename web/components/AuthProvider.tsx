@@ -16,6 +16,8 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  sessionExpired: boolean;
+  clearSessionExpired: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -23,6 +25,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   // On mount, if there is a token, resolve the current user.
   useEffect(() => {
@@ -34,7 +37,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api
       .me(token)
       .then(setUser)
-      .catch(() => {
+      .catch((err) => {
+        // Si es 401, marca sesión como caducada
+        if (err?.status === 401) {
+          setSessionExpired(true);
+        }
         clearToken();
         setUser(null);
       })
@@ -46,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(access_token);
     const me = await api.me(access_token);
     setUser(me);
+    setSessionExpired(false);
   }, []);
 
   const logout = useCallback(() => {
@@ -53,8 +61,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const clearSessionExpired = useCallback(() => {
+    setSessionExpired(false);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        logout,
+        sessionExpired,
+        clearSessionExpired,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
