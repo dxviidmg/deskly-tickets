@@ -14,6 +14,7 @@ import type {
   Ticket,
   TicketDetail,
   User,
+  UserOption,
 } from "./types";
 
 export const TOKEN_COOKIE = "deskly_token";
@@ -115,6 +116,12 @@ export const api = {
       body: JSON.stringify({ nuevo_estado }),
     });
   },
+  updateTicket(id: number, patch: { asignado_a_id?: number | null }): Promise<Ticket> {
+    return request<Ticket>(`/api/tickets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
   addComment(id: number, cuerpo: string): Promise<Comment> {
     return request<Comment>(`/api/tickets/${id}/comentarios`, {
       method: "POST",
@@ -125,6 +132,13 @@ export const api = {
   // --- Users (admin only) ---
   listUsers(): Promise<User[]> {
     return request<User[]>("/api/users");
+  },
+  // Lightweight lookup available to any authenticated user (for selects).
+  listUserOptions(q?: string, limit = 5): Promise<UserOption[]> {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    params.set("limit", String(limit));
+    return request<UserOption[]>(`/api/users/options?${params.toString()}`);
   },
   createUser(email: string, password: string, is_admin: boolean): Promise<User> {
     return request<User>("/api/users", {

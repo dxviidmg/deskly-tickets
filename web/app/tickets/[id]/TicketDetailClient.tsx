@@ -6,6 +6,7 @@ import type { Estado, TicketDetail, TicketEvent } from "@/lib/types";
 import { TRANSICIONES_VALIDAS } from "@/lib/types";
 import { EstadoBadge } from "@/components/Badges";
 import { ConnectionIndicator } from "@/components/ConnectionIndicator";
+import { UserAutocomplete } from "@/components/UserAutocomplete";
 import { useTicketStream } from "@/hooks/useTicketStream";
 
 const ESTADO_LABEL: Record<Estado, string> = {
@@ -70,6 +71,19 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
     }
   };
 
+  const assignUser = async (userId: number | null) => {
+    setBusy(true);
+    setError("");
+    try {
+      await api.updateTicket(ticket.id, { asignado_a_id: userId });
+      await refresh();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo asignar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const posibles = TRANSICIONES_VALIDAS[ticket.estado];
 
   return (
@@ -104,6 +118,16 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Assignee */}
+      <div className="rounded-lg border bg-white p-4">
+        <h2 className="mb-2 text-sm font-medium text-slate-700">Asignado a</h2>
+        <UserAutocomplete
+          currentEmail={ticket.asignado_a}
+          onSelect={assignUser}
+          disabled={busy}
+        />
       </div>
 
       {error && (

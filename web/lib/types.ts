@@ -22,6 +22,11 @@ export interface User {
   creado_en: string;
 }
 
+export interface UserOption {
+  id: number;
+  email: string;
+}
+
 export interface AuthUser {
   id: number;
   email: string;
