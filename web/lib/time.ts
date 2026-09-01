@@ -1,15 +1,18 @@
-// Human-friendly relative time in Spanish (e.g. "hace un minuto",
-// "hace 3 horas", "hace un día", "hace una semana", "hace un mes",
-// "hace un año"). Used for ticket/comment timestamps.
+/**
+ * Tiempo relativo en español (ej: "hace un minuto", "hace 3 horas").
+ * 
+ * Usado para mostrar timestamps de tickets y comentarios
+ * de forma más legible para el usuario.
+ */
 
 interface Unidad {
   segundos: number;
-  singular: string; // "hace un/una <unidad>"
+  singular: string;
   articulo: "un" | "una";
-  plural: string; // "hace N <unidad>s"
+  plural: string;
 }
 
-// Ordered from largest to smallest so we pick the coarsest fitting unit.
+// Ordenadas de mayor a menor para elegir la unidad más apropiada
 const UNIDADES: Unidad[] = [
   { segundos: 31536000, singular: "año", articulo: "un", plural: "años" },
   { segundos: 2592000, singular: "mes", articulo: "un", plural: "meses" },
@@ -20,8 +23,13 @@ const UNIDADES: Unidad[] = [
 ];
 
 /**
- * Returns a relative time string in Spanish for an ISO date, relative to now.
- * Future dates and anything under a minute render as "hace un momento".
+ * Devuelve el tiempo relativo en español para una fecha ISO.
+ * 
+ * Fechas futuras y menos de un minuto se muestran como "hace un momento".
+ * 
+ * @param iso - Fecha en formato ISO string
+ * @param ahora - Fecha de referencia (por defecto, ahora)
+ * @returns Texto como "hace un momento", "hace 5 minutos", "hace 2 días"
  */
 export function tiempoRelativo(iso: string, ahora: Date = new Date()): string {
   const fecha = new Date(iso);

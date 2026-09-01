@@ -1,3 +1,13 @@
+/**
+ * Dashboard principal - Lista de tickets.
+ * 
+ * Muestra una tabla paginada de tickets con:
+ * - Filtros por estado, prioridad y asignado
+ * - Actualizaciones en tiempo real via WebSocket
+ * - Asignación de tickets directamente desde la tabla
+ * - Indicador de estado de conexión
+ * - Animación de highlight en filas actualizadas
+ */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -13,10 +23,13 @@ import { UserAutocomplete } from "@/components/UserAutocomplete";
 import { useTicketStream } from "@/hooks/useTicketStream";
 import { RequireAuth } from "@/components/RequireAuth";
 
+/** Tamaño de página para la paginación */
 const PAGE_SIZE = 10;
 
+/** Estados de carga de la página */
 type LoadState = "loading" | "ready" | "error";
 
+/** Labels en español para los estados */
 const ESTADO_LABEL: Record<Estado, string> = {
   abierto: "Abierto",
   en_progreso: "En progreso",
@@ -25,6 +38,7 @@ const ESTADO_LABEL: Record<Estado, string> = {
   cerrado: "Cerrado",
 };
 
+/** Labels en español para las prioridades */
 const PRIORIDAD_LABEL: Record<Prioridad, string> = {
   baja: "Baja",
   media: "Media",
@@ -32,6 +46,9 @@ const PRIORIDAD_LABEL: Record<Prioridad, string> = {
   urgente: "Urgente",
 };
 
+/**
+ * Página del dashboard protegida por autenticación.
+ */
 export default function DashboardPage() {
   return (
     <RequireAuth>
@@ -40,36 +57,43 @@ export default function DashboardPage() {
   );
 }
 
+/**
+ * Dashboard con la tabla de tickets y toda la lógica de estado.
+ */
 function Dashboard() {
+  // Estado de datos y carga
   const [data, setData] = useState<Page<Ticket> | null>(null);
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState<string>("");
+
+  // Filtros activos
   const [estado, setEstado] = useState<Estado | "">("");
   const [prioridad, setPrioridad] = useState<Prioridad | "">("");
   const [asignadoAId, setAsignadoAId] = useState<number | null>(null);
-  const [users, setUsers] = useState<Array<{ id: number; email: string; nombre_completo: string }>>([]);
   const [page, setPage] = useState(1);
 
-  // Load users for the assignee filter
+  // Usuarios para el filtro de asignado
+  const [users, setUsers] = useState<Array<{ id: number; email: string; nombre_completo: string }>>([]);
+
+  // Cargar lista de usuarios para el filtro de asignado
   useEffect(() => {
     api
       .listUserOptions("", 50)
-      .then((data) => {
-        console.log("Users loaded:", data);
-        setUsers(data);
-      })
-      .catch((err) => {
-        console.error("Failed to load users:", err);
-        setUsers([]);
-      });
+      .then(setUsers)
+      .catch(() => setUsers([]));
   }, []);
-  // Inline assignment (from the table) state.
+
+  // Estado para asignación inline
   const [assigningId, setAssigningId] = useState<number | null>(null);
   const [assignError, setAssignError] = useState("");
 
-  // Ids of rows that changed recently (via live events or inline actions), used
-  // to play a brief highlight so updates are noticeable but not jarring.
+  // IDs de filas con highlight (actualizadas recientemente)
   const [flashIds, setFlashIds] = useState<Set<number>>(new Set());
+
+  /**
+   * Añade highlight temporal a una fila.
+   * El efecto dura 1.2 segundos.
+   */
   const flashRow = useCallback((id: number) => {
     setFlashIds((prev) => new Set(prev).add(id));
     setTimeout(() => {
@@ -81,6 +105,10 @@ function Dashboard() {
     }, 1200);
   }, []);
 
+  /**
+   * Cargar tickets desde la API.
+   * Se ejecuta al cambiar filtros o página.
+   */
   const load = useCallback(async () => {
     setState("loading");
     setError("");
@@ -105,9 +133,10 @@ function Dashboard() {
     load();
   }, [load]);
 
-  // Assign (or clear) a ticket's assignee directly from the table row, reusing
-  // the same endpoint as the detail view. Patches the row in place (no full
-  // reload) so the table doesn't flash the loading skeleton.
+  /**
+   * Asignar (o desasignar) un ticket desde la tabla.
+   * Actualiza la fila in place sin recargar toda la lista.
+   */
   const assignUser = useCallback(
     async (ticketId: number, userId: number | null) => {
       setAssigningId(ticketId);
@@ -118,7 +147,8 @@ function Dashboard() {
         });
         setData((prev) => {
           if (!prev) return prev;
-          // If the updated ticket no longer matches the active filters, drop it.
+
+          // Si el ticket ya no coincide con los filtros, quitarlo
           const stillMatches =
             (!estado || updated.estado === estado) &&
             (!prioridad || updated.prioridad === prioridad) &&
@@ -126,6 +156,7 @@ function Dashboard() {
               (asignadoAId === -1
                 ? updated.asignado_a_id === null
                 : updated.asignado_a_id === asignadoAId));
+
           if (!stillMatches) {
             return {
               ...prev,
@@ -150,7 +181,9 @@ function Dashboard() {
     [estado, prioridad, asignadoAId, flashRow]
   );
 
-  // Does a ticket belong to the currently active filters?
+  /**
+   * Verificar si un ticket coincide con los filtros activos.
+   */
   const matchesFilters = useCallback(
     (t: Ticket) => {
       if (estado && t.estado !== estado) return false;
@@ -167,9 +200,10 @@ function Dashboard() {
     [estado, prioridad, asignadoAId]
   );
 
-  // Live updates: patch the current view in place instead of reloading the
-  // whole list. This avoids the loading skeleton flashing on every event,
-  // which felt like a full-page refresh.
+  /**
+   * Manejar eventos del WebSocket.
+   * Actualiza la tabla in place sin mostrar skeleton.
+   */
   const onEvent = useCallback(
     (event: TicketEvent) => {
       const incoming = event.datos;
@@ -180,9 +214,9 @@ function Dashboard() {
         const idx = prev.items.findIndex((t) => t.id === incoming.id);
         const fits = matchesFilters(incoming);
 
-        // Update / comment on a ticket already visible.
+        // Ticket existente que se actualizó
         if (idx !== -1) {
-          // If it no longer matches the active filters, drop it from the view.
+          // Si ya no coincide con filtros, quitarlo
           if (!fits) {
             const items = prev.items.filter((t) => t.id !== incoming.id);
             return { ...prev, items, total: Math.max(0, prev.total - 1) };
@@ -192,8 +226,7 @@ function Dashboard() {
           return { ...prev, items };
         }
 
-        // New ticket (or one that now matches the filters). Only surface it on
-        // page 1 so we don't distort other pages; still bump the total count.
+        // Ticket nuevo que coincide con filtros
         if (fits && event.tipo === "ticket.creado") {
           const items =
             page === 1
@@ -205,25 +238,29 @@ function Dashboard() {
         return prev;
       });
 
-      // Play the highlight for tickets that are (or become) visible on page 1.
+      // Highlight en tickets actualizados
       if (matchesFilters(incoming) && (page === 1 || event.tipo !== "ticket.creado")) {
         flashRow(incoming.id);
       }
     },
     [matchesFilters, page, flashRow]
   );
+
   const { status } = useTicketStream(onEvent);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
     <div>
+      {/* Cabecera con título e indicador de conexión */}
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold">Tickets</h1>
         <ConnectionIndicator status={status} />
       </div>
 
+      {/* Filtros */}
       <div className="mb-4 grid grid-cols-3 gap-4">
+        {/* Filtro por estado */}
         <div className="flex flex-col gap-2">
           <label htmlFor="estado" className="text-sm text-slate-600">
             Filtrar por estado:
@@ -246,6 +283,7 @@ function Dashboard() {
           </select>
         </div>
 
+        {/* Filtro por prioridad */}
         <div className="flex flex-col gap-2">
           <label htmlFor="prioridad" className="text-sm text-slate-600">
             Filtrar por prioridad:
@@ -268,6 +306,7 @@ function Dashboard() {
           </select>
         </div>
 
+        {/* Filtro por asignado */}
         <div className="flex flex-col gap-2">
           <label htmlFor="asignado" className="text-sm text-slate-600">
             Filtrar por asignado:
@@ -298,16 +337,14 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* Estados de carga */}
       {state === "loading" && <TableSkeleton />}
-
-      {state === "error" && (
-        <ErrorState mensaje={error} onReintentar={load} />
-      )}
-
+      {state === "error" && <ErrorState mensaje={error} onReintentar={load} />}
       {state === "ready" && data && data.items.length === 0 && (
         <EmptyState mensaje="Sin tickets" />
       )}
 
+      {/* Tabla de tickets */}
       {state === "ready" && data && data.items.length > 0 && (
         <>
           {assignError && (
@@ -334,6 +371,7 @@ function Dashboard() {
                       flashIds.has(t.id) ? "ticket-row-flash" : ""
                     }`}
                   >
+                    {/* Título con enlace al detalle */}
                     <td className="px-4 py-2">
                       <Link
                         href={`/tickets/${t.id}`}
@@ -342,12 +380,15 @@ function Dashboard() {
                         {t.titulo}
                       </Link>
                     </td>
+                    {/* Badge de estado */}
                     <td className="px-4 py-2">
                       <EstadoBadge estado={t.estado} />
                     </td>
+                    {/* Badge de prioridad */}
                     <td className="px-4 py-2">
                       <PrioridadBadge prioridad={t.prioridad} />
                     </td>
+                    {/* Selector de asignado */}
                     <td className="px-4 py-2">
                       <UserAutocomplete
                         currentEmail={t.asignado_a}
@@ -356,6 +397,7 @@ function Dashboard() {
                         className="w-56"
                       />
                     </td>
+                    {/* Fecha relativa */}
                     <td
                       className="px-4 py-2 text-slate-500"
                       title={new Date(t.creado_en).toLocaleString()}
@@ -368,6 +410,7 @@ function Dashboard() {
             </table>
           </div>
 
+          {/* Paginación */}
           <div className="mt-4 flex items-center justify-between text-sm">
             <span className="text-slate-500">
               {data.total} ticket(s) · página {data.page} de {totalPages}

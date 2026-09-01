@@ -1,6 +1,19 @@
-// Distinct UI states: a skeleton for loading, an empty state and an error state.
-// Deliberately different visuals (not the same spinner for everything).
+/**
+ * Componentes para estados visuales de la UI.
+ * 
+ * Incluye:
+ * - TableSkeleton: Placeholder animado durante la carga de tablas
+ * - EmptyState: Estado vacío cuando no hay datos
+ * - ErrorState: Estado de error con opción de reintentar
+ * 
+ * Cada estado tiene un diseño visual distintivo para que el usuario
+ * pueda identificar rápidamente qué está pasando.
+ */
 
+/**
+ * Skeleton animado para tablas.
+ * Muestra un placeholder visual mientras cargan los datos.
+ */
 export function TableSkeleton() {
   return (
     <div className="animate-pulse space-y-2" aria-label="Cargando tickets">
@@ -12,6 +25,11 @@ export function TableSkeleton() {
   );
 }
 
+/**
+ * Estado vacío cuando no hay datos que mostrar.
+ * 
+ * @param mensaje - Texto principal que describe qué no hay
+ */
 export function EmptyState({ mensaje }: { mensaje: string }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-white py-16 text-center">
@@ -24,6 +42,12 @@ export function EmptyState({ mensaje }: { mensaje: string }) {
   );
 }
 
+/**
+ * Estado de error con opción de reintentar.
+ * 
+ * @param mensaje - Descripción del error ocurrido
+ * @param onReintentar - Callback para el botón de reintentar (opcional)
+ */
 export function ErrorState({
   mensaje,
   onReintentar,

@@ -1,3 +1,16 @@
+/**
+ * Selector de usuarios con búsqueda (Autocomplete).
+ * 
+ * Permite buscar usuarios por email o nombre y seleccionar uno
+ * para asignarlo a un ticket. Siempre muestra "Asignarme a mí"
+ * como primera opción si hay un usuario autenticado.
+ * 
+ * Características:
+ * - Búsqueda en el servidor con debounce de 250ms
+ * - Máximo 5 resultados
+ * - Opción "Asignarme a mí" siempre disponible
+ * - Se cierra al hacer click fuera
+ */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -6,16 +19,26 @@ import { useAuth } from "./AuthProvider";
 import type { UserOption } from "@/lib/types";
 
 interface Props {
-  currentEmail: string | null; // email currently assigned (for display)
+  /** Email del usuario actualmente asignado (para mostrar) */
+  currentEmail: string | null;
+  /** Callback cuando se selecciona un usuario (null = sin asignar) */
   onSelect: (userId: number | null) => void;
+  /** Deshabilitar el selector */
   disabled?: boolean;
-  /** Width utility class for the container. Defaults to a fixed width. */
+  /** Clase CSS para el ancho del contenedor */
   className?: string;
 }
 
 /**
- * Searchable user picker (Autocomplete). Shows up to 5 users, queries the
- * backend as you type, and always offers "Asignarme a mí" as the first option.
+ * Componente de autocompletado para seleccionar usuarios.
+ * 
+ * @example
+ * ```tsx
+ * <UserAutocomplete
+ *   currentEmail={ticket.asignado_a}
+ *   onSelect={(userId) => handleAssign(userId)}
+ * />
+ * ```
  */
 export function UserAutocomplete({
   currentEmail,
@@ -30,7 +53,7 @@ export function UserAutocomplete({
   const [loading, setLoading] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside click.
+  // Cerrar al hacer click fuera del componente
   useEffect(() => {
     function onClick(e: MouseEvent) {
       if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
@@ -41,7 +64,7 @@ export function UserAutocomplete({
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  // Debounced server-side search whenever the dropdown is open or query changes.
+  // Búsqueda en el servidor con debounce cuando el dropdown está abierto
   useEffect(() => {
     if (!open) return;
     setLoading(true);
@@ -55,6 +78,7 @@ export function UserAutocomplete({
     return () => clearTimeout(t);
   }, [open, query]);
 
+  /** Manejar selección de usuario */
   const choose = (id: number | null) => {
     onSelect(id);
     setOpen(false);
@@ -63,6 +87,7 @@ export function UserAutocomplete({
 
   return (
     <div ref={boxRef} className={`relative ${className}`}>
+      {/* Botón que abre el dropdown */}
       <button
         type="button"
         disabled={disabled}
@@ -73,61 +98,65 @@ export function UserAutocomplete({
         <span className="float-right text-slate-400">▾</span>
       </button>
 
+      {/* Dropdown con búsqueda y opciones */}
       {open && (
         <div className="absolute z-10 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg">
+          {/* Campo de búsqueda */}
           <input
             autoFocus
             value={query || currentEmail || ""}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por email…"
-            className="w-full rounded-t-md border-b border-slate-200 px-3 py-2 text-sm outline-none"
+            placeholder="Buscar usuario..."
+            className="w-full border-b px-3 py-2 text-sm outline-none"
           />
-          <ul className="max-h-56 overflow-auto py-1 text-sm">
-            {/* First option: assign to the current user. */}
-            {user && (
-              <li>
-                <button
-                  type="button"
-                  onClick={() => choose(user.id)}
-                  className="block w-full px-3 py-1.5 text-left font-medium text-blue-700 hover:bg-blue-50"
-                >
-                  Asignarme a mí ({user.email})
-                </button>
-              </li>
-            )}
-            {/* Option to clear the assignee. */}
-            <li>
-              <button
-                type="button"
-                onClick={() => choose(null)}
-                className="block w-full px-3 py-1.5 text-left text-slate-500 hover:bg-slate-50"
-              >
-                Sin asignar
-              </button>
-            </li>
-            <li className="my-1 border-t border-slate-100" />
-            {loading && (
-              <li className="px-3 py-1.5 text-slate-400">Buscando…</li>
-            )}
-            {!loading && options.length === 0 && (
-              <li className="px-3 py-1.5 text-slate-400">Sin resultados</li>
-            )}
-            {!loading &&
-              options.map((o) => (
-                <li key={o.id}>
-                  <button
-                    type="button"
-                    onClick={() => choose(o.id)}
-                    className="block w-full px-3 py-1.5 text-left hover:bg-slate-50"
-                  >
-                    <span className="font-medium">{o.nombre_completo}</span>
-                    <span className="ml-2 text-xs text-slate-400">
-                      {o.email}
-                    </span>
-                  </button>
+
+          {/* Opción "Asignarme a mí" */}
+          {user && (
+            <button
+              type="button"
+              onClick={() => choose(user.id)}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50"
+            >
+              <span className="font-medium text-blue-600">Asignarme a mí</span>
+              <span className="ml-2 text-slate-500">({user.email})</span>
+            </button>
+          )}
+
+          {/* Opción "Sin asignar" */}
+          <button
+            type="button"
+            onClick={() => choose(null)}
+            className="w-full border-t px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-50"
+          >
+            Sin asignar
+          </button>
+
+          {/* Resultados de búsqueda */}
+          {loading ? (
+            <p className="px-3 py-2 text-sm text-slate-400">Buscando...</p>
+          ) : (
+            <ul className="max-h-40 overflow-y-auto">
+              {options
+                .filter((o) => o.id !== user?.id) // No repetir usuario actual
+                .map((opt) => (
+                  <li key={opt.id}>
+                    <button
+                      type="button"
+                      onClick={() => choose(opt.id)}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                    >
+                      <div className="font-medium">{opt.nombre_completo}</div>
+                      <div className="text-slate-500">{opt.email}</div>
+                    </button>
+                  </li>
+                ))}
+              {options.length === 0 && query && (
+                <li className="px-3 py-2 text-sm text-slate-400">
+                  No se encontraron usuarios
                 </li>
-              ))}
-          </ul>
+              )}
+            </ul>
+          )}
         </div>
       )}
     </div>

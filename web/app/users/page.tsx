@@ -1,3 +1,12 @@
+/**
+ * Página de administración de usuarios.
+ * 
+ * Solo accesible para administradores (RequireAuth con adminOnly).
+ * Permite:
+ * - Ver la lista de usuarios
+ * - Crear nuevos usuarios
+ * - Eliminar usuarios existentes
+ */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -7,6 +16,9 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { PasswordInput } from "@/components/PasswordInput";
 import { TableSkeleton, EmptyState, ErrorState } from "@/components/UiStates";
 
+/**
+ * Página protegida solo para administradores.
+ */
 export default function UsersPage() {
   return (
     <RequireAuth adminOnly>
@@ -15,14 +27,19 @@ export default function UsersPage() {
   );
 }
 
+/** Estados de carga de la página */
 type LoadState = "loading" | "ready" | "error";
 
+/**
+ * Panel de administración de usuarios.
+ */
 function UsersAdmin() {
+  // Estado de datos y carga
   const [users, setUsers] = useState<User[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
 
-  // Create form
+  // Campos del formulario de creación
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombre, setNombre] = useState("");
@@ -31,6 +48,9 @@ function UsersAdmin() {
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  /**
+   * Cargar lista de usuarios desde la API.
+   */
   const load = useCallback(async () => {
     setState("loading");
     setError("");
@@ -47,6 +67,10 @@ function UsersAdmin() {
     load();
   }, [load]);
 
+  /**
+   * Crear un nuevo usuario.
+   * Valida y envía los datos del formulario.
+   */
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -59,11 +83,13 @@ function UsersAdmin() {
         apellidos: apellidos.trim(),
         is_admin: isAdmin,
       });
+      // Limpiar formulario
       setEmail("");
       setPassword("");
       setNombre("");
       setApellidos("");
       setIsAdmin(false);
+      // Recargar lista
       await load();
     } catch (e) {
       setFormError(e instanceof ApiError ? e.message : "No se pudo crear");
@@ -72,6 +98,9 @@ function UsersAdmin() {
     }
   };
 
+  /**
+   * Eliminar un usuario tras confirmación.
+   */
   const removeUser = async (id: number) => {
     if (!confirm("¿Eliminar este usuario?")) return;
     try {
@@ -86,13 +115,14 @@ function UsersAdmin() {
     <div>
       <h1 className="mb-4 text-lg font-semibold">Usuarios</h1>
 
-      {/* Create form */}
+      {/* Formulario de creación */}
       <form
         onSubmit={createUser}
         className="mb-6 space-y-3 rounded-lg border bg-white p-4"
       >
         <h2 className="text-sm font-medium text-slate-700">Crear usuario</h2>
         <div className="flex flex-wrap gap-3">
+          {/* Nombre */}
           <input
             type="text"
             value={nombre}
@@ -101,6 +131,7 @@ function UsersAdmin() {
             required
             className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
+          {/* Apellidos */}
           <input
             type="text"
             value={apellidos}
@@ -109,6 +140,7 @@ function UsersAdmin() {
             required
             className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
+          {/* Email */}
           <input
             type="email"
             value={email}
@@ -117,6 +149,7 @@ function UsersAdmin() {
             required
             className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
+          {/* Contraseña */}
           <div className="flex-1">
             <PasswordInput
               value={password}
@@ -127,6 +160,7 @@ function UsersAdmin() {
               className="flex-1"
             />
           </div>
+          {/* Checkbox de admin */}
           <label className="flex items-center gap-1 text-sm text-slate-600">
             <input
               type="checkbox"
@@ -135,6 +169,7 @@ function UsersAdmin() {
             />
             Admin
           </label>
+          {/* Botón de crear */}
           <button
             type="submit"
             disabled={busy}
@@ -143,6 +178,7 @@ function UsersAdmin() {
             Crear
           </button>
         </div>
+        {/* Error del formulario */}
         {formError && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {formError}
@@ -150,11 +186,14 @@ function UsersAdmin() {
         )}
       </form>
 
+      {/* Estados de carga */}
       {state === "loading" && <TableSkeleton />}
       {state === "error" && <ErrorState mensaje={error} onReintentar={load} />}
       {state === "ready" && users.length === 0 && (
         <EmptyState mensaje="Sin usuarios" />
       )}
+
+      {/* Tabla de usuarios */}
       {state === "ready" && users.length > 0 && (
         <div className="overflow-hidden rounded-lg border bg-white">
           <table className="w-full text-sm">

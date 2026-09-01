@@ -1,15 +1,42 @@
+/**
+ * Campo de contraseña con botón para mostrar/ocultar.
+ * 
+ * Permite alternar entre texto visible y oculto (asteriscos)
+ * para que el usuario pueda verificar lo que escribe.
+ */
+
 import { useState } from "react";
 
 interface PasswordInputProps {
+  /** Valor actual de la contraseña */
   value: string;
+  /** Callback cuando cambia el valor */
   onChange: (value: string) => void;
+  /** Placeholder del campo */
   placeholder?: string;
+  /** Si el campo es obligatorio */
   required?: boolean;
+  /** Si el campo está deshabilitado */
   disabled?: boolean;
+  /** Longitud mínima de la contraseña */
   minLength?: number;
+  /** Clases CSS adicionales */
   className?: string;
 }
 
+/**
+ * Input de contraseña con toggle de visibilidad.
+ * 
+ * @example
+ * ```tsx
+ * <PasswordInput
+ *   value={password}
+ *   onChange={setPassword}
+ *   placeholder="Tu contraseña"
+ *   required
+ * />
+ * ```
+ */
 export function PasswordInput({
   value,
   onChange,
@@ -46,7 +73,7 @@ export function PasswordInput({
         title={showPassword ? "Ocultar" : "Mostrar"}
       >
         {showPassword ? (
-          // Eye icon (open)
+          // Icono de ojo abierto (contraseña visible)
           <svg
             className="h-4 w-4"
             fill="none"
@@ -67,7 +94,7 @@ export function PasswordInput({
             />
           </svg>
         ) : (
-          // Eye-off icon (closed)
+          // Icono de ojo tachado (contraseña oculta)
           <svg
             className="h-4 w-4"
             fill="none"

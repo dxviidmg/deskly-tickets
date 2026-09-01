@@ -1,19 +1,36 @@
-// Browser-side token helpers. The JWT is kept in a cookie so it is also sent
-// during SSR requests (via next/headers cookies()).
+/**
+ * Helpers para gestionar el token JWT en el navegador.
+ * 
+ * El JWT se guarda en una cookie para que esté disponible
+ * durante las peticiones SSR (via next/headers cookies()).
+ */
 
 import { TOKEN_COOKIE } from "./api";
 
+/**
+ * Guarda el token JWT en una cookie.
+ * 
+ * Duración: 1 día.
+ * SameSite: Lax (suficiente para uso SSR en el mismo sitio).
+ */
 export function setToken(token: string) {
-  // 1 day; SameSite=Lax is enough for same-site SSR usage.
   document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(
     token
   )}; path=/; max-age=86400; SameSite=Lax`;
 }
 
+/**
+ * Elimina el token JWT de la cookie.
+ */
 export function clearToken() {
   document.cookie = `${TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
 }
 
+/**
+ * Obtiene el token JWT de la cookie.
+ * 
+ * @returns El token si existe, null si no
+ */
 export function getToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(

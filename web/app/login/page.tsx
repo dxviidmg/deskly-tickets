@@ -1,3 +1,13 @@
+/**
+ * Página de inicio de sesión.
+ * 
+ * Permite a los usuarios autenticarse con email y contraseña.
+ * Valida el formulario con Zod y react-hook-form.
+ * 
+ * Casos especiales:
+ * - Si la sesión expiró, muestra un mensaje al usuario
+ * - Redirige al dashboard tras login exitoso
+ */
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
@@ -10,6 +20,10 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { ApiError } from "@/lib/api";
 import { loginSchema, LoginInput } from "@/lib/schemas";
 
+/**
+ * Formulario de login separado para poder usar useSearchParams
+ * dentro de un Suspense boundary.
+ */
 function LoginForm() {
   const { login, clearSessionExpired } = useAuth();
   const router = useRouter();
@@ -17,6 +31,7 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Configuración de react-hook-form con validación Zod
   const {
     register,
     handleSubmit,
@@ -26,7 +41,7 @@ function LoginForm() {
     defaultValues: { email: "", password: "" },
   });
 
-  // Si viene reason=session_expired, mostrar aviso
+  // Mostrar aviso si la sesión expiró (redirigido desde RequireAuth)
   useEffect(() => {
     if (searchParams.get("reason") === "session_expired") {
       setError("Sesión caducada. Inicia de nuevo sesión.");
@@ -34,6 +49,10 @@ function LoginForm() {
     }
   }, [searchParams, clearSessionExpired]);
 
+  /**
+   * Manejar envío del formulario.
+   * Intenta autenticar y redirige al dashboard si tiene éxito.
+   */
   const onSubmit = async (data: LoginInput) => {
     setBusy(true);
     setError("");
@@ -58,6 +77,7 @@ function LoginForm() {
         onSubmit={handleSubmit(onSubmit)}
         className="space-y-3 rounded-lg border bg-white p-5"
       >
+        {/* Campo de email */}
         <div>
           <label className="mb-1 block text-sm text-slate-600">Email</label>
           <input
@@ -69,6 +89,8 @@ function LoginForm() {
             <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
           )}
         </div>
+
+        {/* Campo de contraseña */}
         <div>
           <label className="mb-1 block text-sm text-slate-600">
             Contraseña
@@ -81,11 +103,15 @@ function LoginForm() {
             <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
           )}
         </div>
+
+        {/* Mensaje de error general */}
         {error && (
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </p>
         )}
+
+        {/* Botón de envío */}
         <button
           type="submit"
           disabled={busy}
@@ -98,6 +124,12 @@ function LoginForm() {
   );
 }
 
+/**
+ * Página de login con Suspense para useSearchParams.
+ * 
+ * El Suspense es necesario porque useSearchParams requiere
+ * que el componente se renderice en el cliente.
+ */
 export default function LoginPage() {
   return (
     <Suspense

@@ -1,8 +1,17 @@
-// Shared types mirroring the backend Pydantic schemas (manual end-to-end typing).
+/**
+ * Tipos TypeScript espejo de los schemas Pydantic del backend.
+ * 
+ * Tipado manual end-to-end para asegurar consistencia
+ * entre frontend y backend.
+ */
 
+/** Estados posibles de un ticket */
 export type Estado = "abierto" | "en_progreso" | "resuelto" | "reabierto" | "cerrado";
+
+/** Niveles de prioridad de un ticket */
 export type Prioridad = "baja" | "media" | "alta" | "urgente";
 
+/** Ticket resumido (listado) */
 export interface Ticket {
   id: number;
   titulo: string;
@@ -10,11 +19,12 @@ export interface Ticket {
   prioridad: Prioridad;
   estado: Estado;
   asignado_a_id: number | null;
-  asignado_a: string | null; // assigned user's email (read-only)
+  asignado_a: string | null; // email del usuario asignado (solo lectura)
   creado_en: string;
   actualizado_en: string;
 }
 
+/** Usuario completo */
 export interface User {
   id: number;
   email: string;
@@ -25,18 +35,21 @@ export interface User {
   creado_en: string;
 }
 
+/** Usuario para selectores/autocompletado */
 export interface UserOption {
   id: number;
   email: string;
   nombre_completo: string;
 }
 
+/** Usuario autenticado (desde JWT) */
 export interface AuthUser {
   id: number;
   email: string;
   is_admin: boolean;
 }
 
+/** Comentario de un ticket */
 export interface Comment {
   id: number;
   ticket_id: number;
@@ -45,6 +58,7 @@ export interface Comment {
   creado_en: string;
 }
 
+/** Entrada del historial de cambios de estado */
 export interface StateLog {
   id: number;
   mensaje: string;
@@ -52,11 +66,13 @@ export interface StateLog {
   creado_en: string;
 }
 
+/** Ticket con detalle completo (comentarios e historial) */
 export interface TicketDetail extends Ticket {
   comments: Comment[];
   state_log: StateLog[];
 }
 
+/** Página de resultados paginados */
 export interface Page<T> {
   items: T[];
   total: number;
@@ -64,19 +80,24 @@ export interface Page<T> {
   size: number;
 }
 
-// WebSocket event shape emitted by the backend.
+/** Tipos de eventos WebSocket emitidos por el backend */
 export type EventoTipo =
   | "ticket.creado"
   | "ticket.actualizado"
   | "ticket.comentado";
 
+/** Evento WebSocket de ticket */
 export interface TicketEvent {
   tipo: EventoTipo;
   datos: Ticket;
 }
 
-// Valid state transitions, mirrored from the backend state machine so the UI
-// only offers buttons that will succeed.
+/**
+ * Transiciones de estado válidas.
+ * 
+ * Espejo de la máquina de estados del backend para que
+ * la UI solo ofrezca botones que tendrán éxito.
+ */
 export const TRANSICIONES_VALIDAS: Record<Estado, Estado[]> = {
   abierto: ["en_progreso"],
   en_progreso: ["resuelto"],
@@ -85,6 +106,7 @@ export const TRANSICIONES_VALIDAS: Record<Estado, Estado[]> = {
   cerrado: [],
 };
 
+/** Lista de todos los estados posibles */
 export const ESTADOS: Estado[] = [
   "abierto",
   "en_progreso",
@@ -93,4 +115,5 @@ export const ESTADOS: Estado[] = [
   "cerrado",
 ];
 
+/** Lista de todas las prioridades posibles */
 export const PRIORIDADES: Prioridad[] = ["baja", "media", "alta", "urgente"];

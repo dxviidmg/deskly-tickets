@@ -1,3 +1,14 @@
+/**
+ * Componente cliente para el detalle de ticket.
+ * 
+ * Funcionalidades:
+ * - Edición inline de título y descripción (estilo Jira)
+ * - Transiciones de estado con comentario opcional
+ * - Asignación de usuario
+ * - Comentarios en hilo
+ * - Historial de cambios (state_log)
+ * - Actualizaciones en tiempo real via WebSocket
+ */
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -11,6 +22,7 @@ import { UserAutocomplete } from "@/components/UserAutocomplete";
 import { useTicketStream } from "@/hooks/useTicketStream";
 import { tiempoRelativo } from "@/lib/time";
 
+/** Labels en español para los estados */
 const ESTADO_LABEL: Record<Estado, string> = {
   abierto: "Abierto",
   en_progreso: "En progreso",
@@ -19,45 +31,59 @@ const ESTADO_LABEL: Record<Estado, string> = {
   cerrado: "Cerrado",
 };
 
+/**
+ * Componente interactivo para el detalle de un ticket.
+ * 
+ * @param initial - Datos iniciales del ticket (cargados en SSR)
+ */
 export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
+  // Estado del ticket
   const [ticket, setTicket] = useState<TicketDetail>(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // Inline edit (Jira-style) for title and description.
+  // Campos editables (edición inline estilo Jira)
   const [titulo, setTitulo] = useState(initial.titulo);
   const [descripcion, setDescripcion] = useState(initial.descripcion);
 
-  // Comment form
+  // Formulario de comentario
   const [cuerpo, setCuerpo] = useState("");
 
-  // Transition modal (asks for an optional note explaining the status change).
+  // Modal de transición (pide nota opcional explicando el cambio)
   const [transitionTarget, setTransitionTarget] = useState<Estado | null>(null);
   const [transitionComment, setTransitionComment] = useState("");
 
-  // History modal (audit trail from the ticket's state_log, served by the API).
+  // Modal de historial (audit trail del ticket)
   const [showHistory, setShowHistory] = useState(false);
 
-  // Keep the editable fields in sync when the ticket is refreshed (e.g. via
-  // WebSocket) — unless the user has unsaved local edits.
+  // Sincronizar campos editables cuando el ticket se actualiza
+  // (por ejemplo, via WebSocket), salvo que haya cambios pendientes
   useEffect(() => {
     setTitulo(ticket.titulo);
     setDescripcion(ticket.descripcion);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticket.titulo, ticket.descripcion]);
 
+  /** Verificar si hay cambios pendientes de guardar */
   const dirty =
     titulo.trim() !== ticket.titulo || descripcion.trim() !== ticket.descripcion;
 
+  /**
+   * Recargar el ticket desde la API.
+   * Se usa tras actualizaciones para sincronizar estado.
+   */
   const refresh = useCallback(async () => {
     try {
       const fresh = await api.getTicket(initial.id);
       setTicket(fresh);
     } catch {
-      // keep current state on refresh error
+      // Mantener estado actual si falla la recarga
     }
   }, [initial.id]);
 
+  /**
+   * Guardar cambios en título y descripción.
+   */
   const saveDetails = async () => {
     if (!titulo.trim() || !descripcion.trim()) {
       setError("El título y la descripción no pueden estar vacíos");
@@ -78,7 +104,10 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
     }
   };
 
-  // Live updates: react only to events for this ticket.
+  /**
+   * Manejar eventos del WebSocket.
+   * Solo recarga si el evento es para este ticket.
+   */
   const onEvent = useCallback(
     (event: TicketEvent) => {
       if (event.datos.id === initial.id) refresh();
@@ -87,13 +116,20 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
   );
   const { status } = useTicketStream(onEvent);
 
+  /**
+   * Iniciar transición de estado.
+   * Abre el modal para capturar nota opcional.
+   */
   const doTransition = (nuevo: Estado) => {
-    // Open the modal to capture an optional note explaining the change.
     setError("");
     setTransitionTarget(nuevo);
     setTransitionComment("");
   };
 
+  /**
+   * Confirmar transición de estado.
+   * Ejecuta la transición y añade comentario opcional.
+   */
   const confirmTransition = async () => {
     if (transitionTarget === null) return;
     const nuevo = transitionTarget;
@@ -101,7 +137,7 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
     setError("");
     try {
       await api.transition(ticket.id, nuevo);
-      // Optional note: record why the status changed, Jira-style.
+      // Nota opcional explicando el cambio (estilo Jira)
       const nota = transitionComment.trim();
       if (nota) {
         await api.addComment(
@@ -119,6 +155,9 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
     }
   };
 
+  /**
+   * Enviar un nuevo comentario.
+   */
   const submitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cuerpo.trim()) return;
@@ -135,6 +174,9 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
     }
   };
 
+  /**
+   * Asignar (o desasignar) el ticket a un usuario.
+   */
   const assignUser = async (userId: number | null) => {
     setBusy(true);
     setError("");
@@ -148,10 +190,12 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
     }
   };
 
+  // Transiciones válidas desde el estado actual
   const posibles = TRANSICIONES_VALIDAS[ticket.estado] || [];
 
   return (
     <div className="mt-4 space-y-4">
+      {/* Cabecera con navegación y acciones */}
       <div className="flex items-center justify-between">
         <Link href="/" className="text-sm text-blue-700 hover:underline">
           ← Volver al listado
@@ -168,14 +212,16 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
         </div>
       </div>
 
-      {/* Estado, prioridad, transición y asignación en una fila (columnas). */}
+      {/* Estado, prioridad, transición y asignación */}
       <div className="rounded-lg border bg-white p-4">
         <div className={`grid gap-4 ${posibles.length === 0 ? "sm:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
+          {/* Estado actual */}
           <div>
             <h2 className="mb-2 text-sm font-medium text-slate-700">Estado</h2>
             <EstadoBadge estado={ticket.estado} />
           </div>
 
+          {/* Prioridad */}
           <div>
             <h2 className="mb-2 text-sm font-medium text-slate-700">
               Prioridad
@@ -183,6 +229,7 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
             <PrioridadBadge prioridad={ticket.prioridad} />
           </div>
 
+          {/* Transiciones o info de resolución */}
           <div className="lg:border-l lg:border-slate-100 lg:pl-4">
             <h2 className="mb-2 text-sm font-medium text-slate-700">
               {posibles.length === 0 ? "Resuelto por" : "Cambiar estado"}
@@ -207,6 +254,7 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
             )}
           </div>
 
+          {/* Asignación (solo si hay transiciones disponibles) */}
           {posibles.length > 0 && (
             <div className="lg:border-l lg:border-slate-100 lg:pl-4">
               <h2 className="mb-2 text-sm font-medium text-slate-700">
@@ -223,13 +271,14 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
         </div>
       </div>
 
+      {/* Mensaje de error */}
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </p>
       )}
 
-      {/* Título y descripción editables (estilo Jira). */}
+      {/* Título y descripción editables (estilo Jira) */}
       <div className="rounded-lg border bg-white p-5">
         <input
           value={titulo}
@@ -249,6 +298,7 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
           className="mt-3 w-full resize-y rounded-md border border-transparent px-2 py-1 text-slate-700 hover:border-slate-200 focus:border-slate-300 focus:outline-none disabled:opacity-50"
         />
 
+        {/* Botones de guardar/cancelar */}
         <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
@@ -275,7 +325,7 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
         </div>
       </div>
 
-      {/* Comments */}
+      {/* Comentarios */}
       <div className="rounded-lg border bg-white p-4">
         <h2 className="mb-3 text-sm font-medium text-slate-700">
           Comentarios ({ticket.comments.length})
@@ -301,6 +351,7 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
           </ul>
         )}
 
+        {/* Formulario de nuevo comentario */}
         <form onSubmit={submitComment} className="mt-4 space-y-2">
           <textarea
             value={cuerpo}
@@ -319,7 +370,7 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
         </form>
       </div>
 
-      {/* Transition modal: capture an optional note explaining the change. */}
+      {/* Modal de transición: pedir nota opcional */}
       {transitionTarget !== null && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -373,8 +424,7 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
         </div>
       )}
 
-      {/* History modal: audit trail from the ticket's state_log (served by the
-          API in GET /api/tickets/{id}, refreshed on every update). */}
+      {/* Modal de historial: audit trail del ticket */}
       {showHistory && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
