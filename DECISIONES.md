@@ -617,3 +617,78 @@ Evita una llamada extra y mantiene la consistencia con el estado ya cargado.
 Actualicé la spec (`requirements.md`, criterio 5) para reflejar el modal en lugar
 de una sección fija, y dejé anotado el límite conocido (el mensaje de estado no
 guarda el estado anterior y `usuario_id` puede quedar `null`).
+
+### [Decisión] Seed con historial de transiciones y comentarios escalonados
+
+**Contexto:** El seed creaba los 100 tickets de ejemplo directamente en su estado
+final. Con la tabla `state_log` y los comentarios ya en marcha, ese enfoque dejaba
+tickets "resuelto"/"cerrado" con un historial vacío o incoherente (un único log de
+creación) y sin comentarios, lo que no refleja el uso real. Se pidió que cada
+cambio de status genere un log y un comentario, con un minuto de diferencia entre
+cada cambio.
+
+**Uso de LLM:** Le pedí reescribir `bootstrap.py` para que cada ticket recorra sus
+transiciones desde `abierto` hasta su estado objetivo, insertando un `state_log` y
+un `comment` por cada cambio, con timestamps escalonados de 1 minuto.
+
+**Salida del modelo:** Rutas de ciclo de vida por estado objetivo
+(`abierto → en_progreso → resuelto → {cerrado, reabierto}`); por cada paso inserta
+`state_log` (`"Cambio de status: {estado}"`, mismo formato que los listeners) y un
+`comment` narrativo (autor = usuario asignado, o `sistema@deskly.com` si el ticket
+está sin asignar). Los `creado_en` se escalonan con `timedelta(minutes=1)` desde un
+instante base por ticket.
+
+**Mi decisión:** Acepté. Punto clave: los inserts se hacen con sentencias **Core**
+(`insert(...)`) en lugar de `session.add` del ORM, porque los listeners de
+`events.py` fijan `creado_en = now()` en cada `after_insert`/`after_update` y
+además duplicarían los logs. Los inserts Core no disparan esos listeners, así que
+el seed controla los timestamps y emite él mismo el log inicial de creación. El
+seed sigue siendo idempotente (solo siembra si no hay tickets) y determinista
+(`random.Random(42)`). Actualicé la spec (`requirements.md` y `design.md` §8.1)
+antes de tocar el código, según SDD.
+
+### [Decisión] Filtro "Sin asignar" (asignado_a_id = -1 → IS NULL)
+
+**Contexto:** El filtro de asignación en el dashboard devolvía resultados vacíos
+al seleccionar "Sin asignar". El frontend enviaba `0` como value, pero en SQL
+`asignado_a_id = 0` (donde 0 sería un user id) no es lo mismo que
+`asignado_a_id IS NULL`.
+
+**Solución:** Usar `-1` como sentinela: el frontend envía `-1` cuando selecciona
+"Sin asignar", y el backend interpreta `asignado_a_id = -1` como
+`Ticket.asignado_a_id.is_(None)` para filtrar correctamente. Así se distingue
+entre "filtro desactivado" (no envía parámetro), "usuario específico" (ID > 0) y
+"sin asignar" (-1).
+
+**Mi decisión:** Implementé el fix. Patrón limpio y evita ambigüedad con IDs reales.
+
+### [Decisión] Lógica de asignación en seed: abiertos 50/50
+
+**Contexto:** El seed asignaba usuarios aleatoriamente a todos los tickets. En la
+realidad, los tickets "abiertos" pueden estar sin asignar (esperando que un agente
+los tome), pero en estados posteriores (en_progreso, resuelto, etc.) siempre hay
+un agente trabajando.
+
+**Solución:** En el seed, si `estado == abierto`:
+- Índices pares (i % 2 == 0): asignado a un usuario aleatorio.
+- Índices impares (i % 2 == 1): sin asignar (NULL).
+Para otros estados: siempre asignado. El autor del comentario es el email del
+asignado o `sistema@deskly.com` si está sin asignar.
+
+**Mi decisión:** Implementé. 50/50 en abiertos es realista para un prototipo con
+100 tickets.
+
+### [Decisión] Modal de historial: fecha completa + orden cronológico
+
+**Contexto:** El modal mostraba solo el tiempo relativo ("hace una semana"),
+visible al pasar mouse en el title. El orden estaba descendente (más reciente
+primero), cuando es más natural leer el historial del principio al final.
+
+**Solución:** 
+- Frontend: Mostrar fecha completa (`toLocaleString()`) + separador + tiempo relativo
+  (ej: "01/09/2026, 08:06:10 · hace una semana").
+- Backend: Cambiar `order_by="StateLog.creado_en.desc()"` a `.asc()` en el modelo
+  `Ticket.state_log`, para que devuelva logs de más antiguo a más reciente.
+
+**Mi decisión:** Implementé ambos cambios. Mejora UX: la fecha nunca queda oculta
+y el flujo temporal es intuitivo (inicio → fin del ciclo de vida del ticket).
