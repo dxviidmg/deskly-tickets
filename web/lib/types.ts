@@ -45,8 +45,16 @@ export interface Comment {
   creado_en: string;
 }
 
+export interface StateLog {
+  id: number;
+  mensaje: string;
+  usuario_id: number | null;
+  creado_en: string;
+}
+
 export interface TicketDetail extends Ticket {
   comments: Comment[];
+  state_log: StateLog[];
 }
 
 export interface Page<T> {

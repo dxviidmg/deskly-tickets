@@ -64,6 +64,7 @@ class CommentOut(BaseModel):
 
 class TicketDetail(TicketOut):
     comments: list[CommentOut] = []
+    state_log: list["StateLogOut"] = []
 
 
 # --- Pagination ----------------------------------------------------------
@@ -135,3 +136,14 @@ class UserOption(BaseModel):
     id: int
     email: EmailStr
     nombre_completo: str
+
+
+class StateLogOut(BaseModel):
+    """Audit log entry for ticket transitions and assignments."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    mensaje: str
+    usuario_id: int | None
+    creado_en: datetime

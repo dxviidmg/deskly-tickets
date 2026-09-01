@@ -567,3 +567,53 @@ Frontend: carga lista de usuarios al montar, renderiza select con opciones
 **Mi decisión:** Acepté. Select en lugar de autocomplete (como estado/prioridad)
 para consistencia UI. Limit=50 (máximo del backend, no 100). Carga una sola vez
 al montar la página.
+
+### [Decisión] Registro de auditoría de estado (state_log) vía listeners de SQLAlchemy
+
+**Contexto:** No existía trazabilidad histórica de los cambios de estado y de
+asignación de un ticket. Se pidió un registro de auditoría (audit trail) que
+quedara asociado a cada ticket y se mostrara en su detalle.
+
+**Uso de LLM:** Le pedí crear una tabla de auditoría y registrar automáticamente
+los cambios de `estado` y `asignado_a_id`.
+
+**Salida del modelo:** Tabla `state_log` (migración `0002_add_state_log`) con
+`ticket_id` (FK CASCADE), `mensaje`, `usuario_id` (FK SET NULL) e índices en
+`ticket_id` y `creado_en`. Modelo `StateLog` con relación `delete-orphan` desde
+`Ticket`, schema `StateLogOut`, y carga vía `selectinload` en el detalle. El
+registro se dispara con listeners `after_insert`/`after_update` sobre `Ticket`,
+usando `get_history` para detectar los cambios. Ademas generó un `logs.py` con
+helpers `log_estado_change`/`log_assignment`.
+
+**Mi decisión:** Acepté la tabla y los listeners, pero descarté `logs.py`: era
+código muerto (nadie lo importaba) que duplicaba el mecanismo de los listeners;
+tener dos caminos para lo mismo confunde. Los listeners son transparentes para
+los routers. Límite conocido: el `usuario_id` del cambio de estado queda en
+`None` porque el listener no tiene acceso al usuario autenticado del request;
+para el prototipo es aceptable, atribuirlo requeriría pasar el actor al listener.
+Detecté también que el LLM reescribió `events.py` eliminando las constantes de
+eventos WebSocket (`TICKET_CREATED/UPDATED/COMMENTED`) que aún importan los
+routers; las restauré en el mismo módulo para no romper el arranque de la API.
+
+### [Decisión] Modal de historial de cambios por ticket
+
+**Contexto:** La tabla `state_log` ya se exponía en `GET /api/tickets/{id}`, pero
+no había forma de verla en el frontend. Se pidió un modal que muestre el historial
+por ticket vía API.
+
+**Uso de LLM:** Le pedí implementar un modal en el detalle del ticket que liste el
+`state_log` que devuelve la API.
+
+**Salida del modelo:** Tipo `StateLog` en `types.ts` y campo `state_log` en
+`TicketDetail`. Botón "Historial (N)" junto al indicador de conexión que abre un
+modal con la lista de logs (mensaje + tiempo relativo), ordenados como los
+devuelve el backend (más recientes primero). Reutiliza `tiempoRelativo` de
+`lib/time.ts` y el patrón visual del modal de transición.
+
+**Mi decisión:** Acepté. El modal no hace un fetch propio: consume el `state_log`
+que ya viene en el `TicketDetail` cargado (misma API que alimenta el detalle), y
+se refresca junto con el ticket tras cada transición/asignación/evento WebSocket.
+Evita una llamada extra y mantiene la consistencia con el estado ya cargado.
+Actualicé la spec (`requirements.md`, criterio 5) para reflejar el modal en lugar
+de una sección fija, y dejé anotado el límite conocido (el mensaje de estado no
+guarda el estado anterior y `usuario_id` puede quedar `null`).

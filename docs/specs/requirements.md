@@ -80,8 +80,17 @@ Criterios de aceptación:
 3. Cada log incluye quién hizo el cambio (usuario autenticado) y un timestamp.
 4. El endpoint `GET /api/tickets/{id}` deberá incluir un array `state_log` con
    los registros ordenados por timestamp descendente (más recientes primero).
-5. El detalle del ticket en el frontend deberá mostrar una sección "Historial de
-   cambios" listando los logs de forma legible.
+5. El detalle del ticket en el frontend deberá ofrecer un botón "Historial" que
+   abra un modal listando los logs (`state_log`) de forma legible, cada uno con
+   su mensaje y timestamp, ordenados de más reciente a más antiguo. Los datos
+   provienen del `state_log` que devuelve `GET /api/tickets/{id}` (misma API que
+   alimenta el detalle), por lo que el modal refleja el estado ya cargado y se
+   actualiza al refrescar el ticket.
+
+Nota de implementación: en esta entrega el mensaje de estado se registra como
+"Cambio de status: [estado nuevo]" (sin el estado anterior) y `usuario_id` puede
+quedar `null`, porque los listeners de SQLAlchemy no tienen acceso al usuario
+autenticado del request. Atribuir el actor queda como paso siguiente.
 - `en_progreso → resuelto`
 - `resuelto → cerrado`
 - `resuelto → abierto` (reabierto)

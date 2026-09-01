@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { api, ApiError, TOKEN_COOKIE } from "@/lib/api";
@@ -22,12 +21,8 @@ export default async function TicketDetailPage({
     const ticket = await api.getTicket(id, token);
     return (
       <div>
-        <Link href="/" className="text-sm text-blue-700 hover:underline">
-          ← Volver al listado
-        </Link>
-
         {/* Order, transitions, comments and live updates on the client.
-            The status/assignee section renders above the title/description. */}
+            The "back to list" link and the live indicator share a row. */}
         <TicketDetailClient initial={ticket} />
       </div>
     );

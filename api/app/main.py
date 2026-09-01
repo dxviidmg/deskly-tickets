@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.bootstrap import seed
 from app.config import get_settings
+from app.events import receive_ticket_after_insert, receive_ticket_after_update  # noqa: F401
 from app.routers import auth, tickets, user_options, users, webhooks, websocket
 from app.state_machine import InvalidTransitionError
 from app.ws import manager

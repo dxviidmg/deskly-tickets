@@ -70,6 +70,11 @@ class Ticket(Base):
         order_by="Comment.creado_en",
     )
 
+    state_log: Mapped[list["StateLog"]] = relationship(
+        cascade="all, delete-orphan",
+        order_by="StateLog.creado_en.desc()",
+    )
+
     __table_args__ = (
         # Listing filters by estado (most common dashboard filter) and prioridad.
         Index("ix_tickets_estado", "estado"),
@@ -115,4 +120,22 @@ class WebhookEvent(Base):
     )
     procesado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class StateLog(Base):
+    """Audit log for ticket state transitions and assignments."""
+
+    __tablename__ = "state_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticket_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    mensaje: Mapped[str] = mapped_column(Text, nullable=False)
+    usuario_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )

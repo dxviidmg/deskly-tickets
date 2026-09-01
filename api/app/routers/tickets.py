@@ -113,7 +113,7 @@ async def get_ticket(
     stmt = (
         select(Ticket)
         .where(Ticket.id == ticket_id)
-        .options(selectinload(Ticket.comments))
+        .options(selectinload(Ticket.comments), selectinload(Ticket.state_log))
     )
     ticket = await session.scalar(stmt)
     if ticket is None:

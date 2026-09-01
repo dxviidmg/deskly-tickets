@@ -9,6 +9,7 @@ import { EstadoBadge, PrioridadBadge } from "@/components/Badges";
 import { ConnectionIndicator } from "@/components/ConnectionIndicator";
 import { UserAutocomplete } from "@/components/UserAutocomplete";
 import { useTicketStream } from "@/hooks/useTicketStream";
+import { tiempoRelativo } from "@/lib/time";
 
 const ESTADO_LABEL: Record<Estado, string> = {
   abierto: "Abierto",
@@ -33,6 +34,9 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
   // Transition modal (asks for an optional note explaining the status change).
   const [transitionTarget, setTransitionTarget] = useState<Estado | null>(null);
   const [transitionComment, setTransitionComment] = useState("");
+
+  // History modal (audit trail from the ticket's state_log, served by the API).
+  const [showHistory, setShowHistory] = useState(false);
 
   // Keep the editable fields in sync when the ticket is refreshed (e.g. via
   // WebSocket) — unless the user has unsaved local edits.
@@ -152,7 +156,16 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
         <Link href="/" className="text-sm text-blue-700 hover:underline">
           ← Volver al listado
         </Link>
-        <ConnectionIndicator status={status} />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowHistory(true)}
+            className="rounded-md border border-slate-300 px-3 py-1 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            Historial ({ticket.state_log.length})
+          </button>
+          <ConnectionIndicator status={status} />
+        </div>
       </div>
 
       {/* Estado, prioridad, transición y asignación en una fila (columnas). */}
@@ -355,6 +368,60 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
               >
                 {busy ? "Cambiando…" : "Confirmar cambio"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History modal: audit trail from the ticket's state_log (served by the
+          API in GET /api/tickets/{id}, refreshed on every update). */}
+      {showHistory && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowHistory(false)}
+        >
+          <div
+            className="flex max-h-[80vh] w-full max-w-md flex-col rounded-lg bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-5 py-3">
+              <h2 className="text-base font-semibold text-slate-800">
+                Historial de cambios
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowHistory(false)}
+                aria-label="Cerrar"
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-5 py-4">
+              {ticket.state_log.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  Aún no hay cambios registrados.
+                </p>
+              ) : (
+                <ol className="space-y-3">
+                  {ticket.state_log.map((log) => (
+                    <li
+                      key={log.id}
+                      className="border-l-2 border-slate-200 pl-3"
+                    >
+                      <p className="text-sm text-slate-700">{log.mensaje}</p>
+                      <time
+                        dateTime={log.creado_en}
+                        title={new Date(log.creado_en).toLocaleString()}
+                        className="text-xs text-slate-400"
+                      >
+                        {tiempoRelativo(log.creado_en)}
+                      </time>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           </div>
         </div>
