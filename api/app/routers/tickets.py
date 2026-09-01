@@ -79,12 +79,15 @@ async def list_tickets(
     size: int = Query(20, ge=1, le=100),
     estado: Estado | None = None,
     prioridad: Prioridad | None = None,
+    asignado_a_id: int | None = None,
 ) -> Page[TicketOut]:
     filters = []
     if estado is not None:
         filters.append(Ticket.estado == estado)
     if prioridad is not None:
         filters.append(Ticket.prioridad == prioridad)
+    if asignado_a_id is not None:
+        filters.append(Ticket.asignado_a_id == asignado_a_id)
 
     total_stmt = select(func.count()).select_from(Ticket)
     if filters:

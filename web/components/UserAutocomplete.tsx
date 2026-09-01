@@ -77,7 +77,7 @@ export function UserAutocomplete({
         <div className="absolute z-10 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg">
           <input
             autoFocus
-            value={query}
+            value={query || currentEmail || ""}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar por email…"
             className="w-full rounded-t-md border-b border-slate-200 px-3 py-2 text-sm outline-none"
