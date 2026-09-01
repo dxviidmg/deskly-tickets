@@ -58,8 +58,16 @@ email-validator==2.2.0
 # [cryptography]: backend criptográfico para firmas
 # passlib: librería de hashing (bcrypt, argon2, etc.)
 # [bcrypt]: algoritmo específico de hashing (muy seguro)
+#
+# IMPORTANTE: fijamos bcrypt==4.0.1 explícitamente. passlib 1.7.4 (sin
+# mantenimiento desde 2020) es INCOMPATIBLE con bcrypt >= 4.1: al arrancar
+# no puede leer la versión de bcrypt (AttributeError '__about__') y su rutina
+# interna de detección de bugs dispara "ValueError: password cannot be longer
+# than 72 bytes", devolviendo 500 en el login. bcrypt 4.0.1 es la última
+# versión que funciona correctamente con passlib 1.7.4.
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 
 # ========== TESTING ==========
 # pytest: framework de tests (ejecuta y reporta)
