@@ -21,6 +21,7 @@ const ESTADO_LABEL: Record<Estado, string> = {
   abierto: "Abierto",
   en_progreso: "En progreso",
   resuelto: "Resuelto",
+  reabierto: "Reabierto",
   cerrado: "Cerrado",
 };
 
@@ -45,7 +46,23 @@ function Dashboard() {
   const [error, setError] = useState<string>("");
   const [estado, setEstado] = useState<Estado | "">("");
   const [prioridad, setPrioridad] = useState<Prioridad | "">("");
+  const [asignadoAId, setAsignadoAId] = useState<number | null>(null);
+  const [users, setUsers] = useState<Array<{ id: number; email: string; nombre_completo: string }>>([]);
   const [page, setPage] = useState(1);
+
+  // Load users for the assignee filter
+  useEffect(() => {
+    api
+      .listUserOptions("", 50)
+      .then((data) => {
+        console.log("Users loaded:", data);
+        setUsers(data);
+      })
+      .catch((err) => {
+        console.error("Failed to load users:", err);
+        setUsers([]);
+      });
+  }, []);
   // Inline assignment (from the table) state.
   const [assigningId, setAssigningId] = useState<number | null>(null);
   const [assignError, setAssignError] = useState("");
@@ -54,7 +71,13 @@ function Dashboard() {
     setState("loading");
     setError("");
     try {
-      const res = await api.listTickets({ page, size: PAGE_SIZE, estado, prioridad });
+      const res = await api.listTickets({
+        page,
+        size: PAGE_SIZE,
+        estado,
+        prioridad,
+        asignado_a_id: asignadoAId,
+      });
       setData(res);
       setState("ready");
     } catch (e) {
@@ -62,7 +85,7 @@ function Dashboard() {
       setError(msg);
       setState("error");
     }
-  }, [page, estado, prioridad]);
+  }, [page, estado, prioridad, asignadoAId]);
 
   useEffect(() => {
     load();
@@ -146,6 +169,29 @@ function Dashboard() {
             {PRIORIDADES.map((p) => (
               <option key={p} value={p}>
                 {PRIORIDAD_LABEL[p]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="asignado" className="text-sm text-slate-600">
+            Filtrar por asignado:
+          </label>
+          <select
+            id="asignado"
+            value={asignadoAId ?? ""}
+            onChange={(e) => {
+              setPage(1);
+              setAsignadoAId(e.target.value === "" ? null : Number(e.target.value));
+            }}
+            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+          >
+            <option value="">Todos</option>
+            <option value="0">Sin asignar</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre_completo} ({u.email})
               </option>
             ))}
           </select>

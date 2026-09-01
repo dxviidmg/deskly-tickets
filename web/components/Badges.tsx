@@ -4,6 +4,7 @@ const ESTADO_STYLES: Record<Estado, string> = {
   abierto: "bg-blue-100 text-blue-800",
   en_progreso: "bg-amber-100 text-amber-800",
   resuelto: "bg-green-100 text-green-800",
+  reabierto: "bg-orange-100 text-orange-800",
   cerrado: "bg-slate-200 text-slate-700",
 };
 
@@ -11,6 +12,7 @@ const ESTADO_LABEL: Record<Estado, string> = {
   abierto: "Abierto",
   en_progreso: "En progreso",
   resuelto: "Resuelto",
+  reabierto: "Reabierto",
   cerrado: "Cerrado",
 };
 

@@ -1,6 +1,6 @@
 // Shared types mirroring the backend Pydantic schemas (manual end-to-end typing).
 
-export type Estado = "abierto" | "en_progreso" | "resuelto" | "cerrado";
+export type Estado = "abierto" | "en_progreso" | "resuelto" | "reabierto" | "cerrado";
 export type Prioridad = "baja" | "media" | "alta" | "urgente";
 
 export interface Ticket {
@@ -72,7 +72,8 @@ export interface TicketEvent {
 export const TRANSICIONES_VALIDAS: Record<Estado, Estado[]> = {
   abierto: ["en_progreso"],
   en_progreso: ["resuelto"],
-  resuelto: ["cerrado", "abierto"],
+  resuelto: ["cerrado", "reabierto"],
+  reabierto: ["en_progreso"],
   cerrado: [],
 };
 
@@ -80,6 +81,7 @@ export const ESTADOS: Estado[] = [
   "abierto",
   "en_progreso",
   "resuelto",
+  "reabierto",
   "cerrado",
 ];
 

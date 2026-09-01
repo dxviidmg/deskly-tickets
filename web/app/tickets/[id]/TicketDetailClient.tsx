@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import type { Estado, TicketDetail, TicketEvent } from "@/lib/types";
 import { TRANSICIONES_VALIDAS } from "@/lib/types";
@@ -13,6 +14,7 @@ const ESTADO_LABEL: Record<Estado, string> = {
   abierto: "Abierto",
   en_progreso: "En progreso",
   resuelto: "Resuelto",
+  reabierto: "Reabierto",
   cerrado: "Cerrado",
 };
 
@@ -27,6 +29,10 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
 
   // Comment form
   const [cuerpo, setCuerpo] = useState("");
+
+  // Transition modal (asks for an optional note explaining the status change).
+  const [transitionTarget, setTransitionTarget] = useState<Estado | null>(null);
+  const [transitionComment, setTransitionComment] = useState("");
 
   // Keep the editable fields in sync when the ticket is refreshed (e.g. via
   // WebSocket) — unless the user has unsaved local edits.
@@ -77,11 +83,30 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
   );
   const { status } = useTicketStream(onEvent);
 
-  const doTransition = async (nuevo: Estado) => {
+  const doTransition = (nuevo: Estado) => {
+    // Open the modal to capture an optional note explaining the change.
+    setError("");
+    setTransitionTarget(nuevo);
+    setTransitionComment("");
+  };
+
+  const confirmTransition = async () => {
+    if (transitionTarget === null) return;
+    const nuevo = transitionTarget;
     setBusy(true);
     setError("");
     try {
       await api.transition(ticket.id, nuevo);
+      // Optional note: record why the status changed, Jira-style.
+      const nota = transitionComment.trim();
+      if (nota) {
+        await api.addComment(
+          ticket.id,
+          `Estado: ${ESTADO_LABEL[ticket.estado]} → ${ESTADO_LABEL[nuevo]}\n${nota}`
+        );
+      }
+      setTransitionTarget(null);
+      setTransitionComment("");
       await refresh();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "No se pudo cambiar el estado");
@@ -119,17 +144,20 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
     }
   };
 
-  const posibles = TRANSICIONES_VALIDAS[ticket.estado];
+  const posibles = TRANSICIONES_VALIDAS[ticket.estado] || [];
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-between">
+        <Link href="/" className="text-sm text-blue-700 hover:underline">
+          ← Volver al listado
+        </Link>
         <ConnectionIndicator status={status} />
       </div>
 
       {/* Estado, prioridad, transición y asignación en una fila (columnas). */}
       <div className="rounded-lg border bg-white p-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={`grid gap-4 ${posibles.length === 0 ? "sm:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
           <div>
             <h2 className="mb-2 text-sm font-medium text-slate-700">Estado</h2>
             <EstadoBadge estado={ticket.estado} />
@@ -144,11 +172,11 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
 
           <div className="lg:border-l lg:border-slate-100 lg:pl-4">
             <h2 className="mb-2 text-sm font-medium text-slate-700">
-              Cambiar estado
+              {posibles.length === 0 ? "Resuelto por" : "Cambiar estado"}
             </h2>
             {posibles.length === 0 ? (
               <p className="text-sm text-slate-500">
-                No hay transiciones disponibles.
+                {ticket.asignado_a || "sin asignar"}
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -166,17 +194,19 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
             )}
           </div>
 
-          <div className="lg:border-l lg:border-slate-100 lg:pl-4">
-            <h2 className="mb-2 text-sm font-medium text-slate-700">
-              Asignado a
-            </h2>
-            <UserAutocomplete
-              currentEmail={ticket.asignado_a}
-              onSelect={assignUser}
-              disabled={busy}
-              className="w-full"
-            />
-          </div>
+          {posibles.length > 0 && (
+            <div className="lg:border-l lg:border-slate-100 lg:pl-4">
+              <h2 className="mb-2 text-sm font-medium text-slate-700">
+                Asignado a
+              </h2>
+              <UserAutocomplete
+                currentEmail={ticket.asignado_a}
+                onSelect={assignUser}
+                disabled={busy}
+                className="w-full"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -275,6 +305,60 @@ export function TicketDetailClient({ initial }: { initial: TicketDetail }) {
           </button>
         </form>
       </div>
+
+      {/* Transition modal: capture an optional note explaining the change. */}
+      {transitionTarget !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => !busy && setTransitionTarget(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-semibold text-slate-800">
+              Cambiar estado
+            </h2>
+            <p className="mt-1 flex items-center gap-2 text-sm text-slate-600">
+              <EstadoBadge estado={ticket.estado} />
+              <span aria-hidden>→</span>
+              <EstadoBadge estado={transitionTarget} />
+            </p>
+
+            <label className="mt-4 block text-sm text-slate-600">
+              Comentario (opcional): explica por qué cambia el estado
+            </label>
+            <textarea
+              autoFocus
+              value={transitionComment}
+              onChange={(e) => setTransitionComment(e.target.value)}
+              disabled={busy}
+              rows={3}
+              placeholder="Ej.: Se resolvió tras reiniciar el servicio."
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:opacity-50"
+            />
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setTransitionTarget(null)}
+                disabled={busy}
+                className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmTransition}
+                disabled={busy}
+                className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {busy ? "Cambiando…" : "Confirmar cambio"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

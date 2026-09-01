@@ -8,6 +8,7 @@ class Estado(str, Enum):
     abierto = "abierto"
     en_progreso = "en_progreso"
     resuelto = "resuelto"
+    reabierto = "reabierto"
     cerrado = "cerrado"
 
 
