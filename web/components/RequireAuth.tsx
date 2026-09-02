@@ -10,7 +10,7 @@
  * ```tsx
  * // Página que requiere autenticación
  * <RequireAuth>
- *   <Dashboard />
+ *   <TicketList />
  * </RequireAuth>
  * 
  * // Página solo para administradores

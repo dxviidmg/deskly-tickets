@@ -6,7 +6,7 @@
  * 
  * Casos especiales:
  * - Si la sesión expiró, muestra un mensaje al usuario
- * - Redirige al dashboard tras login exitoso
+ * - Redirige al listado de tickets tras login exitoso
  */
 "use client";
 
@@ -51,7 +51,7 @@ function LoginForm() {
 
   /**
    * Manejar envío del formulario.
-   * Intenta autenticar y redirige al dashboard si tiene éxito.
+   * Intenta autenticar y redirige al listado de tickets si tiene éxito.
    */
   const onSubmit = async (data: LoginInput) => {
     setBusy(true);

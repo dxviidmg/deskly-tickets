@@ -1,5 +1,5 @@
 /**
- * Dashboard principal - Lista de tickets.
+ * Listado principal de tickets.
  * 
  * Muestra una tabla paginada de tickets con:
  * - Filtros por estado, prioridad y asignado
@@ -47,20 +47,20 @@ const PRIORIDAD_LABEL: Record<Prioridad, string> = {
 };
 
 /**
- * Página del dashboard protegida por autenticación.
+ * Página del listado de tickets protegida por autenticación.
  */
-export default function DashboardPage() {
+export default function TicketListPage() {
   return (
     <RequireAuth>
-      <Dashboard />
+      <TicketList />
     </RequireAuth>
   );
 }
 
 /**
- * Dashboard con la tabla de tickets y toda la lógica de estado.
+ * Listado con la tabla de tickets y toda la lógica de estado.
  */
-function Dashboard() {
+function TicketList() {
   // Estado de datos y carga
   const [data, setData] = useState<Page<Ticket> | null>(null);
   const [state, setState] = useState<LoadState>("loading");

@@ -17,7 +17,7 @@ const STYLES: Record<ConnectionStatus, { dot: string; label: string }> = {
 /**
  * Componente que muestra el estado de la conexión WebSocket.
  * 
- * Se usa en el dashboard para indicar si las actualizaciones
+ * Se usa en el listado de tickets para indicar si las actualizaciones
  * en tiempo real están activas.
  * 
  * @param status - Estado actual de la conexión
