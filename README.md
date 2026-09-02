@@ -17,9 +17,38 @@ Requisitos: Docker y Docker Compose.
 ```bash
 git clone <tu-repo>
 cd deskly-tickets
-cp .env.example .env
+# Copiar las plantillas de variables de entorno (una por servicio):
+cp api/.env.example api/.env      # backend + infraestructura
+cp web/.env.example web/.env      # frontend
 docker compose up --build
 ```
+
+> Las variables están separadas por servicio: `api/.env` (backend, base de
+> datos, JWT, webhook, seed) y `web/.env` (URLs del frontend). Ningún secreto
+> se versiona; solo los `.env.example`.
+
+### Dos formas de ejecución (desarrollo y producción)
+
+La única diferencia entre desarrollo y producción es si se **siembran datos de
+ejemplo** al arrancar. Se controla con la variable `DESKLY_SEED` en `api/.env`:
+
+| Modo | `DESKLY_SEED` | Qué hace al arrancar |
+|------|---------------|----------------------|
+| **Desarrollo** | `true`  | Crea admin + usuarios y tickets de ejemplo (si la BD está vacía) |
+| **Producción** | `false` | No siembra datos; arranca limpio |
+
+```bash
+# Desarrollo (con datos de ejemplo) — valor por defecto en api/.env.example
+DESKLY_SEED=true   docker compose up --build
+
+# Producción (sin datos de ejemplo)
+DESKLY_SEED=false  docker compose up --build
+```
+
+También puedes fijar el valor directamente en `api/.env`. Como el seed es
+"crear-si-no-existe" y la base de datos persiste en un volumen, para un arranque
+de producción totalmente limpio empieza con `DESKLY_SEED=false` desde el inicio
+(o resetea el volumen con `docker compose down -v`).
 
 Esto levanta cuatro servicios:
 
@@ -37,13 +66,13 @@ Esto levanta cuatro servicios:
 
 ### Credenciales del seed
 
-Se crea un usuario administrador inicial (configurable en `.env`):
+Se crea un usuario administrador inicial (configurable en `api/.env`):
 
 - **Email:** `admin@deskly.com`
 - **Contraseña:** `admin123`
 
 También se crea un agente de ejemplo (`agente@deskly.com` / `agente123`) y unos
-tickets de muestra. Cambia estas credenciales en `.env` antes de cualquier uso real.
+tickets de muestra. Cambia estas credenciales en `api/.env` antes de cualquier uso real.
 
 ---
 
@@ -88,10 +117,10 @@ Cubren la máquina de estados (transiciones válidas e inválidas), el webhook
 ## Cómo probar el webhook manualmente
 
 El webhook verifica una firma **HMAC-SHA256** del cuerpo con el secreto
-`WEBHOOK_SECRET` (definido en `.env`), enviada en el header `X-Signature`.
+`WEBHOOK_SECRET` (definido en `api/.env`), enviada en el header `X-Signature`.
 
 ```bash
-SECRET=change-me   # el valor de WEBHOOK_SECRET en tu .env
+SECRET=change-me   # el valor de WEBHOOK_SECRET en tu api/.env
 BODY='{"event_id":"inc-001","titulo":"Ticket externo","descripcion":"Creado vía webhook","prioridad":"alta"}'
 SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')
 
