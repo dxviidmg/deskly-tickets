@@ -9,6 +9,7 @@
  * Métodos principales:
  * - login: Iniciar sesión y obtener token
  * - me: Obtener usuario autenticado
+ * - createTicket: Crear un ticket nuevo
  * - listTickets: Listar tickets con filtros y paginación
  * - getTicket: Obtener detalle de un ticket
  * - updateTicket: Actualizar parcialmente un ticket
@@ -159,6 +160,35 @@ export const api = {
   },
 
   // --- Tickets ---
+
+  /**
+   * Crea un ticket nuevo (requiere autenticación).
+   *
+   * Los tickets se crean siempre **sin asignar** (`asignado_a_id = null`), igual
+   * que los que entran por webhook. La asignación se hace después desde el
+   * listado o el detalle del ticket.
+   *
+   * @param data - Datos del ticket: título, descripción y prioridad opcional.
+   *   La prioridad por defecto la aplica el backend ("media").
+   * @returns El ticket creado (con id, estado inicial "abierto" y timestamps).
+   *
+   * @example
+   * const ticket = await api.createTicket({
+   *   titulo: "No carga la página",
+   *   descripcion: "Error 500 al abrir el detalle",
+   *   prioridad: "alta",
+   * });
+   */
+  createTicket(data: {
+    titulo: string;
+    descripcion: string;
+    prioridad?: Prioridad;
+  }): Promise<Ticket> {
+    return request<Ticket>("/api/tickets", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
 
   /** Lista tickets con filtros opcionales y paginación */
   listTickets(params: ListParams = {}, token?: string | null): Promise<Page<Ticket>> {

@@ -22,6 +22,7 @@ import { ConnectionIndicator } from "@/components/ConnectionIndicator";
 import { UserAutocomplete } from "@/components/UserAutocomplete";
 import { useTicketStream } from "@/hooks/useTicketStream";
 import { RequireAuth } from "@/components/RequireAuth";
+import { CreateTicketModal } from "@/components/CreateTicketModal";
 
 /** Tamaño de página para la paginación */
 const PAGE_SIZE = 10;
@@ -89,6 +90,9 @@ function TicketList() {
 
   // IDs de filas con highlight (actualizadas recientemente)
   const [flashIds, setFlashIds] = useState<Set<number>>(new Set());
+
+  // Visibilidad del modal de creación de ticket
+  const [createOpen, setCreateOpen] = useState(false);
 
   /**
    * Añade highlight temporal a una fila.
@@ -252,10 +256,19 @@ function TicketList() {
 
   return (
     <div>
-      {/* Cabecera con título e indicador de conexión */}
+      {/* Cabecera con título, botón de creación e indicador de conexión */}
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold">Tickets</h1>
-        <ConnectionIndicator status={status} />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Nuevo ticket
+          </button>
+          <ConnectionIndicator status={status} />
+        </div>
       </div>
 
       {/* Filtros */}
@@ -434,6 +447,14 @@ function TicketList() {
           </div>
         </>
       )}
+
+      {/* Modal de creación de ticket. Al crear, recargamos la lista desde el
+          servidor (consistente y sin depender del evento WebSocket). */}
+      <CreateTicketModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => load()}
+      />
     </div>
   );
 }
