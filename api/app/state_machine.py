@@ -18,18 +18,23 @@ Diagrama de estados:
     abierto
       |
       v
-    en_progreso
-      |
-      v
-    resuelto -----> cerrado
-      |
-      +-----------> abierto (reabierto)
+    en_progreso <----+
+      |              |
+      v              |
+    resuelto         |
+      |   \          |
+      |    v         |
+      |  reabierto --+
+      v    |
+    cerrado <--------+
 
 Transiciones válidas:
 - abierto → en_progreso
 - en_progreso → resuelto
 - resuelto → cerrado
-- resuelto → abierto (reabierto)
+- resuelto → reabierto (el problema reapareció)
+- reabierto → en_progreso (se retoma el trabajo)
+- reabierto → cerrado
 - cerrado → (ninguno, estado terminal)
 """
 
@@ -39,8 +44,10 @@ from app.enums import Estado
 ALLOWED_TRANSITIONS: dict[Estado, set[Estado]] = {
     Estado.abierto: {Estado.en_progreso},
     Estado.en_progreso: {Estado.resuelto},
-    # Desde "resuelto" tenemos dos opciones
-    Estado.resuelto: {Estado.cerrado, Estado.abierto},
+    # Desde "resuelto": se cierra (confirmado) o se reabre (el problema volvió).
+    Estado.resuelto: {Estado.cerrado, Estado.reabierto},
+    # Desde "reabierto": se retoma el trabajo o se cierra directamente.
+    Estado.reabierto: {Estado.en_progreso, Estado.cerrado},
     # Desde "cerrado" no hay transiciones (estado final)
     Estado.cerrado: set(),
 }
@@ -69,15 +76,15 @@ class InvalidTransitionError(Exception):
         # Normalizar a enum (por si vienen como strings de la BD)
         current = Estado(current)
         requested = Estado(requested)
-        
+
         self.current = current
         self.requested = requested
-        
+
         # Lista de estados permitidos desde el actual (ordenados)
         self.allowed = sorted(
             e.value for e in ALLOWED_TRANSITIONS.get(current, set())
         )
-        
+
         # Mensaje de error
         super().__init__(
             f"Invalid transition {current.value} -> {requested.value}"
@@ -104,10 +111,10 @@ def can_transition(current: Estado, requested: Estado) -> bool:
     # Normalizar a enum (pueden ser strings de la BD)
     current = Estado(current)
     requested = Estado(requested)
-    
+
     # Buscar current en el mapa, si no existe devolver set() vacío
     allowed_from_current = ALLOWED_TRANSITIONS.get(current, set())
-    
+
     # Verificar si requested está en los permitidos
     return requested in allowed_from_current
 

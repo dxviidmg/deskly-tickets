@@ -15,7 +15,9 @@ from app.state_machine import (
         (Estado.abierto, Estado.en_progreso),
         (Estado.en_progreso, Estado.resuelto),
         (Estado.resuelto, Estado.cerrado),
-        (Estado.resuelto, Estado.abierto),  # reopen
+        (Estado.resuelto, Estado.reabierto),  # reopen
+        (Estado.reabierto, Estado.en_progreso),  # se retoma el trabajo
+        (Estado.reabierto, Estado.cerrado),
     ],
 )
 def test_valid_transitions(current, requested):
@@ -29,6 +31,7 @@ def test_valid_transitions(current, requested):
         (Estado.abierto, Estado.cerrado),
         (Estado.abierto, Estado.resuelto),
         (Estado.en_progreso, Estado.cerrado),
+        (Estado.resuelto, Estado.abierto),  # ya no: la reapertura va a "reabierto"
         (Estado.cerrado, Estado.abierto),
         (Estado.cerrado, Estado.en_progreso),
     ],
