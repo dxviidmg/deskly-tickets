@@ -1114,3 +1114,49 @@ innecesaria). La diferencia dev/prod se controla con `DESKLY_SEED` en `api/.env`
 `true` en desarrollo (siembra admin + usuarios + tickets de ejemplo si la BD está
 vacía), `false` en producción (no siembra). El seed ya es "crear-si-no-existe",
 así que es seguro para reinicios.
+
+---
+
+### [Decisión] Auditoría de calidad/seguridad: 4 mejoras
+
+**Contexto:** Hice una revisión del proyecto desde los ángulos de seguridad,
+calidad de código y buenas prácticas (Python/TS). Salieron varias áreas de
+oportunidad; apliqué las de mayor impacto/esfuerzo.
+
+**Uso de LLM:** Le pedí que actuara como revisor (calidad, ciberseguridad, senior,
+Python, TypeScript) y listara áreas de oportunidad, luego que las corrigiera.
+
+**Salida del modelo:** Identificó, entre otras, un estado huérfano en la máquina
+de estados, un posible timing attack en el login, CORS con wildcards junto a
+credenciales, `DESKLY_SEED` leído fuera del sistema de settings, y acceso a un
+atributo privado del manager de WebSocket en el health check.
+
+**Mi decisión:** Apliqué cuatro correcciones:
+
+1. **Máquina de estados — `reabierto` era un estado huérfano.** El enum `Estado`
+   incluía `reabierto` y el seed creaba tickets en ese estado, pero
+   `ALLOWED_TRANSITIONS` no tenía ninguna transición hacia/desde él: un ticket
+   `reabierto` quedaba atascado (todo 409) y la reapertura real iba a `abierto`,
+   contradiciendo la documentación. Corregí el grafo:
+   `resuelto → {cerrado, reabierto}` y `reabierto → {en_progreso, cerrado}`.
+   Actualicé el diagrama del docstring y los tests (26 pasan).
+
+2. **Timing attack en el login.** Cuando el email no existía, no se ejecutaba
+   `verify_password`, así que la respuesta era más rápida y permitía enumerar
+   usuarios por latencia. Ahora, si el usuario no existe, se verifica contra un
+   hash señuelo (`_DUMMY_HASH`) para igualar el tiempo. El resultado sigue siendo
+   401 con mensaje genérico.
+
+3. **CORS explícito.** `allow_methods=["*"]` + `allow_headers=["*"]` junto con
+   `allow_credentials=True` es un antipatrón. Los sustituí por listas concretas
+   de métodos (GET/POST/PATCH/DELETE/OPTIONS) y headers (Authorization,
+   Content-Type).
+
+4. **`DESKLY_SEED` como campo de Settings + encapsular Redis en el health.**
+   `DESKLY_SEED` se leía con `os.getenv` en `main.py`, evadiendo el sistema de
+   configuración; ahora es `settings.deskly_seed: bool`. Y el health check
+   accedía a `manager._redis` (atributo privado); añadí un método público
+   `manager.redis_healthy()` que devuelve True/False/None.
+
+Verificado: 26 tests pasan; `ruff` sin errores nuevos en los archivos tocados;
+`docker compose config` válido; `Settings` parsea `deskly_seed` como bool.
