@@ -95,6 +95,12 @@ class Settings(BaseSettings):
     admin_email: str
     admin_password: str
 
+    # ========== SEED (activar/desactivar) ==========
+    # Si es True, al arrancar se siembran datos de ejemplo (si la BD está vacía).
+    # Controla la diferencia entre desarrollo (True) y producción (False).
+    # Obligatorio: debe venir del .env (DESKLY_SEED=true|false).
+    deskly_seed: bool
+
     @property
     def cors_origins_list(self) -> list[str]:
         """

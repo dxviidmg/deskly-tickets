@@ -85,24 +85,24 @@ class ConnectionManager:
         if not redis_url:
             logger.info("No REDIS_URL set; WebSocket runs in local-only mode.")
             return
-        
+
         try:
             # Importar el cliente de Redis
             import redis.asyncio as aioredis
 
             # Conectar a Redis
             self._redis = aioredis.from_url(redis_url, decode_responses=True)
-            
+
             # Verificar que Redis responde (fail fast)
             await self._redis.ping()
-            
+
             # Crear una suscripción al canal de eventos
             self._pubsub = self._redis.pubsub()
             await self._pubsub.subscribe(EVENTS_CHANNEL)
-            
+
             # Iniciar tarea de background que escucha Redis
             self._reader_task = asyncio.create_task(self._reader())
-            
+
             logger.info("Connected to Redis pub/sub for WebSocket fan-out.")
         except Exception as exc:  # pragma: no cover - depends on environment
             # Redis no disponible: funcionar en modo degradado
@@ -112,6 +112,24 @@ class ConnectionManager:
             )
             self._redis = None
             self._pubsub = None
+
+    async def redis_healthy(self) -> bool | None:
+        """
+        Indica el estado de Redis para el health check, sin exponer atributos
+        internos.
+
+        Returns:
+            - True  si Redis está configurado y responde al ping.
+            - False si está configurado pero no responde.
+            - None  si Redis no está configurado (modo local-only).
+        """
+        if self._redis is None:
+            return None
+        try:
+            await self._redis.ping()
+            return True
+        except Exception:
+            return False
 
     async def shutdown(self) -> None:
         """
@@ -132,7 +150,7 @@ class ConnectionManager:
             except (asyncio.CancelledError, Exception):
                 pass
             self._reader_task = None
-        
+
         # Cerrar suscripción Redis
         if self._pubsub is not None:
             try:
@@ -141,7 +159,7 @@ class ConnectionManager:
             except Exception:
                 pass
             self._pubsub = None
-        
+
         # Cerrar conexión Redis
         if self._redis is not None:
             try:
@@ -163,7 +181,7 @@ class ConnectionManager:
         """
         # Aceptar la conexión (handshake WebSocket)
         await websocket.accept()
-        
+
         # Agregar a nuestro conjunto de conexiones activas
         async with self._lock:
             self._connections.add(websocket)
@@ -205,7 +223,7 @@ class ConnectionManager:
             "tipo": tipo,
             "datos": jsonable_encoder(datos)  # Convierte a JSON serializable
         }
-        
+
         # Si tenemos Redis: publicar en el canal
         if self._redis is not None:
             try:
@@ -213,7 +231,7 @@ class ConnectionManager:
                 return
             except Exception as exc:  # pragma: no cover
                 logger.warning("Redis publish failed (%s); broadcasting local.", exc)
-        
+
         # Fallback: broadcast local directo
         await self._broadcast_local(message)
 
@@ -235,14 +253,14 @@ class ConnectionManager:
                 # Ignorar mensajes no-data (subscribe confirmations, etc.)
                 if message.get("type") != "message":
                     continue
-                
+
                 # Deserializar el payload
                 try:
                     payload = json.loads(message["data"])
                 except (ValueError, TypeError):
                     # JSON inválido, saltar
                     continue
-                
+
                 # Retransmitir a conexiones locales
                 await self._broadcast_local(payload)
         except asyncio.CancelledError:  # pragma: no cover

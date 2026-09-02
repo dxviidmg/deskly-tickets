@@ -14,7 +14,6 @@ FastAPI es un framework moderno para construir APIs web en Python, similar a
 Flask pero con validación automática de datos y documentación interactiva.
 """
 
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
@@ -48,15 +47,15 @@ async def lifespan(app: FastAPI):
     La variable 'yield' marca el punto en que la app está lista para recibir requests.
     """
     # La semilla crea datos de ejemplo (usuarios, tickets) si no existen.
-    # Se puede deshabilitar con DESKLY_SEED=false en las variables de entorno
-    if os.getenv("DESKLY_SEED", "true").lower() != "false":
+    # Se controla con DESKLY_SEED en el .env (true en desarrollo, false en prod).
+    if settings.deskly_seed:
         await seed()
-    
+
     # Conectamos el gestor de WebSocket a Redis para poder retransmitir eventos
     # a través de múltiples instancias. Si Redis no está disponible,
     # el manager funciona en modo local-only.
     await manager.startup(settings.redis_url)
-    
+
     try:
         yield  # La app está lista para atender requests
     finally:
@@ -75,8 +74,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Métodos y headers explícitos (no wildcard): con allow_credentials=True,
+    # usar "*" es un antipatrón y algunos navegadores lo rechazan. Listamos solo
+    # lo que la API realmente usa.
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -141,14 +143,14 @@ async def health() -> dict[str, str]:
         health_status["db"] = "error"
         health_status["status"] = "degraded"
 
-    # Verificar Redis: usamos el ping del cliente de Redis
-    if manager._redis is not None:
-        try:
-            await manager._redis.ping()
-            health_status["redis"] = "ok"
-        except Exception:
-            health_status["redis"] = "error"
-            health_status["status"] = "degraded"
+    # Verificar Redis mediante el método público del manager (sin tocar
+    # atributos internos): True=ok, False=error, None=no configurado.
+    redis_state = await manager.redis_healthy()
+    if redis_state is True:
+        health_status["redis"] = "ok"
+    elif redis_state is False:
+        health_status["redis"] = "error"
+        health_status["status"] = "degraded"
     else:
         # Redis es opcional: si no está configurado, no es un error
         health_status["redis"] = "not_configured"
