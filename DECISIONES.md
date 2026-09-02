@@ -1005,3 +1005,112 @@ correctamente.
 con el resto del listener. Actualicé el comentario para dejar claro qué atributos
 tiene realmente `History`. Verifiqué con grep que no había otros usos de
 `.modified` en el backend.
+
+---
+
+### [Decisión] Un .env por servicio (api/.env y web/.env), sin duplicación
+
+**Contexto:** Las variables de entorno estaban duplicadas: cada una vivía en el
+`.env` de la raíz Y otra vez en el bloque `environment: ${VAR:-default}` del
+`docker-compose.yml`. Eso es frágil (se desincronizan) y confuso. Además,
+mezclaba variables de backend y de frontend en un solo archivo.
+
+**Uso de LLM:** Le pedí que detectara redundancias en la configuración de
+entorno y propusiera una estructura sin duplicación.
+
+**Salida del modelo:** Señaló que el `.env` de la raíz no se inyecta
+automáticamente al contenedor (solo interpola `${VAR}` en el YAML), y que la
+forma limpia es usar `env_file:` por servicio, con una única fuente de verdad.
+
+**Mi decisión:** Reorganicé los `.env` por servicio:
+- **`api/.env`** (+ `api/.env.example`): variables del backend e infraestructura
+  (POSTGRES_*, DATABASE_URL, REDIS_URL, JWT_*, WEBHOOK_*, ADMIN_*, CORS, seed).
+  Lo consumen los servicios `db` y `api` vía `env_file`.
+- **`web/.env`** (+ `web/.env.example`): variables del frontend. `API_INTERNAL_URL`
+  (runtime SSR) vía `env_file`; `NEXT_PUBLIC_*` como build args (son build-time,
+  se hornean en el bundle, no se leen en runtime).
+- Eliminé el `.env`/`.env.example` de la raíz y el bloque `environment:` duplicado
+  del compose. Ahora cada variable vive en un único sitio.
+- `DATABASE_URL`/`REDIS_URL` usan el host del servicio Docker (`db`/`redis`) y
+  viven en `api/.env` (el modo desarrollo es con Docker, así que no hay conflicto
+  con `localhost`).
+
+Nota de la prueba: ahora el arranque requiere copiar dos ejemplos
+(`cp api/.env.example api/.env` y `cp web/.env.example web/.env`) en vez de uno.
+Es una desviación menor del enunciado a cambio de una separación más limpia.
+
+---
+
+### [Decisión] Configuración obligatoria: sin defaults en el código (fail-fast)
+
+**Contexto:** `config.py` tenía valores por defecto para todo, incluidos
+secretos (`jwt_secret="change-me-too"`, `webhook_secret="change-me"`) y la
+contraseña del admin (`admin123`). Un secreto con default en el código es
+peligroso: si al desplegar se olvida configurarlo, la app arranca insegura en
+silencio con una clave conocida (que está en el repo).
+
+**Uso de LLM:** Le pregunté si tener esos valores en config.py era mala práctica.
+
+**Salida del modelo:** Confirmó que para secretos sí lo es, y recomendó hacerlos
+obligatorios (sin default) para que la app falle al arrancar si faltan.
+
+**Mi decisión:** Establecí la regla de que **ningún secreto ni URL se hardcodea
+en `.py` ni en `.ts/.tsx`**; todo viene del `.env`. En `config.py` quité TODOS
+los defaults: cada campo es obligatorio, así que pydantic falla al arrancar si
+falta una variable (fail-fast). Cambié `extra="forbid"` a `extra="ignore"`
+porque `api/.env` es compartido con el contenedor de Postgres (contiene
+POSTGRES_*, que no son campos de Settings) y "forbid" los rechazaría.
+
+---
+
+### [Decisión] Frontend: sin URLs por defecto (fail-fast también en el cliente)
+
+**Contexto:** `web/lib/api.ts` y `web/hooks/useTicketStream.ts` usaban
+`process.env.X || "http://localhost:8000"`: una URL hardcodeada como respaldo.
+
+**Uso de LLM:** Le pedí auditar URLs/secretos hardcodeados en TS/TSX y Python.
+
+**Salida del modelo:** Encontró los fallbacks de URL en esos dos archivos (el
+resto de coincidencias eran comentarios/docstrings, no valores reales).
+
+**Mi decisión:** Quité los fallbacks. Ahora ambas funciones leen solo de
+`process.env` y lanzan un error claro en español si la variable no está definida.
+Las URLs viven en `web/.env` (runtime) y en los build args (build-time), nunca
+en el código.
+
+---
+
+### [Decisión] Tests rotos preexistentes: modelo User con nombre/apellidos
+
+**Contexto:** Al hacer la configuración obligatoria y ejecutar la suite,
+afloraron tests que ya estaban rotos de antes: el modelo `User` tiene `nombre` y
+`apellidos` como NOT NULL, pero el helper `_create_user` del conftest y el test
+`test_admin_can_create_user` no los proporcionaban (IntegrityError y 422).
+
+**Uso de LLM:** Le pedí diagnosticar los fallos de la suite.
+
+**Salida del modelo:** Identificó que el conftest creaba usuarios sin
+nombre/apellidos y que el payload del test de creación tampoco los enviaba.
+
+**Mi decisión:** Actualicé `conftest.py` (helper `_create_user` con nombre y
+apellidos, y todas las variables de entorno que ahora son obligatorias) y el
+payload de `test_admin_can_create_user`. La suite queda en verde: 23 tests pasan.
+
+---
+
+### [Decisión] Diferencia dev/prod mediante DESKLY_SEED en el .env
+
+**Contexto:** Quería un modo desarrollo (con datos de ejemplo) y uno de
+producción (sin sembrar datos).
+
+**Uso de LLM:** Le pedí valorar si crear docker-compose separados por entorno.
+
+**Salida del modelo:** Explicó que se puede hacer con overrides de compose, pero
+que si la única diferencia es el seed, basta con la variable `DESKLY_SEED` que ya
+lee el código.
+
+**Mi decisión:** No creo archivos de compose por entorno (evito complejidad
+innecesaria). La diferencia dev/prod se controla con `DESKLY_SEED` en `api/.env`:
+`true` en desarrollo (siembra admin + usuarios + tickets de ejemplo si la BD está
+vacía), `false` en producción (no siembra). El seed ya es "crear-si-no-existe",
+así que es seguro para reinicios.
