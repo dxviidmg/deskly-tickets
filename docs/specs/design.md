@@ -47,7 +47,7 @@ necesitamos y complicaría el hilo de comentarios y la unicidad del `event_id`.
 ### Índices justificados
 
 - `ix_tickets_estado` sobre `tickets.estado`: el listado principal filtra por
-  estado; es el filtro más frecuente del dashboard.
+  estado; es el filtro más frecuente del listado.
 - `ix_tickets_prioridad` sobre `tickets.prioridad`: segundo filtro disponible.
 - `uq_webhook_event_id` (UNIQUE) sobre `webhook_events.event_id`: garantiza
   idempotencia del webhook.
@@ -224,7 +224,7 @@ inicial ("Cambio de status: abierto") lo emite explícitamente el propio seed.
 
 ## 9. Frontend
 
-- `/` (dashboard): Server Component que hace fetch inicial paginado; filtro por
+- `/` (listado de tickets): Server Component que hace fetch inicial paginado; filtro por
   estado vía query param. Estados de UI: carga (skeleton), vacío (mensaje +
   ilustración), error (mensaje + reintento).
 - `/tickets/[id]`: Server Component (SSR) que hace fetch del ticket + comentarios.
@@ -256,7 +256,7 @@ api/
   tests/
 web/
   app/
-    page.tsx           # dashboard
+    page.tsx           # listado de tickets
     tickets/[id]/page.tsx
   lib/api.ts           # cliente tipado
   hooks/useTicketStream.ts

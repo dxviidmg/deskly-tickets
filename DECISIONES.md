@@ -184,15 +184,15 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 
 ---
 
-### [Decisión] SSR solo en el detalle; dashboard interactivo en el cliente
+### [Decisión] SSR solo en el detalle; listado de tickets interactivo en el cliente
 
-**Contexto:** El reto pide que el **detalle** `/tickets/[id]` sea renderizado en el servidor (SSR). El dashboard, en cambio, necesita filtro y actualización en vivo.
+**Contexto:** El reto pide que el **detalle** `/tickets/[id]` sea renderizado en el servidor (SSR). El listado de tickets, en cambio, necesita filtro y actualización en vivo.
 
 **Uso de LLM:** Le pedí las dos páginas.
 
-**Salida del modelo:** Planteó el detalle como componente de servidor (SSR) y el dashboard con interacción en el cliente.
+**Salida del modelo:** Planteó el detalle como componente de servidor (SSR) y el listado con interacción en el cliente.
 
-**Mi decisión:** El detalle se renderiza en el servidor: la primera carga ya trae el ticket y sus comentarios (mejor para SSR y para enlaces directos). La interacción del detalle (cambiar estado, comentar, tiempo real) va en un componente de cliente aparte. El dashboard lo hice de cliente porque combina filtro, paginación y actualización en vivo, que son inherentemente interactivos. Así cada página usa el enfoque que mejor le encaja.
+**Mi decisión:** El detalle se renderiza en el servidor: la primera carga ya trae el ticket y sus comentarios (mejor para SSR y para enlaces directos). La interacción del detalle (cambiar estado, comentar, tiempo real) va en un componente de cliente aparte. El listado lo hice de cliente porque combina filtro, paginación y actualización en vivo, que son inherentemente interactivos. Así cada página usa el enfoque que mejor le encaja.
 
 ---
 
@@ -205,7 +205,7 @@ los tests, no leyéndolos. Después del cambio, los 14 tests pasan sin avisos.
 **Salida del modelo:** Entregó un hook que abre la conexión, la limpia al desmontar y expone el estado de conexión.
 
 **Mi decisión:** Además de la limpieza, añadí **reconexión automática** con una espera creciente (hasta 5 s) cuando la conexión se pierde, y un **indicador visible**
-(En vivo / Conectando / Desconectado) para que el usuario sepa el estado. Al recibir un evento, el dashboard recarga la lista y el detalle recarga ese ticket: es lo más simple y siempre muestra datos consistentes con el servidor (preferí esto antes que aplicar cambios parciales en el cliente, que es más frágil).
+(En vivo / Conectando / Desconectado) para que el usuario sepa el estado. Al recibir un evento, el listado recarga la lista y el detalle recarga ese ticket: es lo más simple y siempre muestra datos consistentes con el servidor (preferí esto antes que aplicar cambios parciales en el cliente, que es más frágil).
 
 ---
 
@@ -648,7 +648,7 @@ antes de tocar el código, según SDD.
 
 ### [Decisión] Filtro "Sin asignar" (asignado_a_id = -1 → IS NULL)
 
-**Contexto:** El filtro de asignación en el dashboard devolvía resultados vacíos
+**Contexto:** El filtro de asignación en el listado devolvía resultados vacíos
 al seleccionar "Sin asignar". El frontend enviaba `0` como value, pero en SQL
 `asignado_a_id = 0` (donde 0 sería un user id) no es lo mismo que
 `asignado_a_id IS NULL`.
@@ -860,7 +860,7 @@ consistentes en toda la app. Se puede usar con `toast.success()` y
 
 ### [Decisión] DataTable abstracto reutilizable
 
-**Contexto:** La lógica de tablas (loading, empty, render) estaba en Dashboard
+**Contexto:** La lógica de tablas (loading, empty, render) estaba en TicketList
 con 396 LOC.
 
 **Uso de LLM:** Propuse extraer un componente DataTable genérico.
@@ -911,7 +911,7 @@ los ejemplos de prueba. El webhook ahora ignora cualquier intento de asignar y
 fuerza `asignado_a_id = NULL` en la creación. Actualicé README y especificaciones
 para documentar que la asignación es manual tras la creación.
 
-### [Decisión] Dashboard: actualización in-place con highlight visual
+### [Decisión] Listado de tickets: actualización in-place con highlight visual
 
 **Contexto:** Al asignar un ticket desde la tabla, se recargaba toda la lista
 mostrando el skeleton de carga, lo que interrumpía la navegación.

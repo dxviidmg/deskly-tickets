@@ -87,7 +87,7 @@ services:
       - "8000:8000"
 
   # ========== SERVICIO: Next.js Frontend ==========
-  # Interfaz web: dashboard de tickets, login, etc.
+  # Interfaz web: listado de tickets, login, etc.
   # Se construye desde ./web/Dockerfile (con multi-stage: deps → builder → runtime)
   web:
     build:

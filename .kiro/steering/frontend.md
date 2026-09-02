@@ -16,7 +16,7 @@ TanStack Query 5, react-hook-form + Zod, sonner, Tailwind.
 - Por defecto en App Router los componentes son **Server Components**.
 - Marcar `"use client"` solo cuando se necesite interactividad, estado, efectos o
   hooks del navegador (formularios, WebSocket, TanStack Query).
-- El detalle de ticket usa **SSR**; el dashboard es interactivo (cliente).
+- El detalle de ticket usa **SSR**; el listado de tickets es interactivo (cliente).
 
 ## Estado del servidor (TanStack Query)
 

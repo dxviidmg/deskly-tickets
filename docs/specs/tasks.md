@@ -49,7 +49,7 @@ Leyenda: `[ ]` pendiente · `[x]` hecho · *(bonus)* opcional.
 ## Fase 6 — Frontend
 
 - [ ] `chore(web): scaffold next.js 14 app router with typed api client`
-- [ ] `feat(web): dashboard with paginated table, filter and UI states`
+- [ ] `feat(web): ticket list with paginated table, filter and UI states`
 - [ ] `feat(web): SSR ticket detail with comments and transition buttons`
 - [ ] `feat(web): useTicketStream hook with connection indicator`
 

@@ -111,7 +111,7 @@ async def get_ticket(ticket_id: int) -> TicketDetail:
  * PROPÓSITO: Renderiza una tarjeta individual de ticket
  *
  * Qué hace: muestra titulo, estado, prioridad, etc.
- * Cuándo se usa: en listas de tickets, en dashboard
+ * Cuándo se usa: en listas de tickets, en el listado principal
  * Props: ticket, onUpdate, loading
  * Estado: none (componente "pure", sin estado local)
  */
@@ -186,7 +186,7 @@ export function useTicketStream() {
 // 4. useTicketStream() recibe evento
 // 5. React Query cache se actualiza
 // 6. Componentes que usan ese hook se re-renderizan
-// 7. El nuevo ticket aparece en el dashboard sin refresh
+// 7. El nuevo ticket aparece en el listado sin refresh
 
 async function handleCreateTicket() {
   try {

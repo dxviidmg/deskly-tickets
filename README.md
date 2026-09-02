@@ -164,7 +164,7 @@ delegando la garantía a la propia base de datos. El detalle está en
 
 ### Índices justificados
 
-- `ix_tickets_estado` — el listado del dashboard filtra por estado (el filtro más frecuente).
+- `ix_tickets_estado` — el listado de tickets filtra por estado (el filtro más frecuente).
 - `ix_tickets_prioridad` — segundo filtro disponible.
 - `ix_tickets_asignado_a_id` — para consultar tickets por usuario asignado.
 - `UNIQUE (event_id)` en `webhook_events` — garantiza la idempotencia del webhook.
@@ -187,7 +187,7 @@ delegando la garantía a la propia base de datos. El detalle está en
 - Repository Pattern para lógica de negocio desacoplada.
 
 **Frontend**
-- Dashboard con tabla paginada, filtros y highlight visual en actualizaciones.
+- Listado de tickets con tabla paginada, filtros y highlight visual en actualizaciones.
 - Detalle `/tickets/[id]` **renderizado en servidor (SSR)** con hilo de
   comentarios, historial de cambios y edición inline.
 - React Query para cache y sincronización automática.
