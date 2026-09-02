@@ -227,6 +227,21 @@ inicial ("Cambio de status: abierto") lo emite explícitamente el propio seed.
 - `/` (listado de tickets): Server Component que hace fetch inicial paginado; filtro por
   estado vía query param. Estados de UI: carga (skeleton), vacío (mensaje +
   ilustración), error (mensaje + reintento).
+- **Crear ticket desde el listado**: en la cabecera del listado hay un botón
+  "Nuevo ticket" que abre un modal (`CreateTicketModal`) con un formulario
+  (react-hook-form + Zod, `ticketCreateSchema`). Al enviar, llama a
+  `api.createTicket`, cierra el modal, muestra un toast (sonner) y refresca la
+  lista. El modal se apoya en un componente `Modal` genérico reutilizable.
+  - `Modal` (`components/Modal.tsx`): Client Component de presentación. Renderiza
+    un overlay + cuadro de diálogo centrado. Props: `open`, `onClose`, `title`,
+    `children`. Cierre por botón, tecla `Escape` y clic en el overlay. Bloquea el
+    scroll del `body` mientras está abierto y restaura el foco al cerrar.
+  - `CreateTicketModal` (`components/CreateTicketModal.tsx`): Client Component con
+    el formulario (título, descripción y prioridad). Usa `PRIORIDADES_LABELS`
+    para el selector de prioridad. Los tickets se crean **sin asignar**
+    (`asignado_a_id = null`), como los del webhook; la asignación se hace luego
+    desde el listado o el detalle. En éxito invoca un callback `onCreated(ticket)`
+    para que el listado se actualice sin recargar.
 - `/tickets/[id]`: Server Component (SSR) que hace fetch del ticket + comentarios.
   Botones de transición como Client Component que llaman al backend.
 - `useTicketStream`: hook cliente que abre el WebSocket, actualiza estado local
@@ -261,5 +276,7 @@ web/
   lib/api.ts           # cliente tipado
   hooks/useTicketStream.ts
   components/
+    Modal.tsx          # modal genérico reutilizable
+    CreateTicketModal.tsx # formulario de creación de ticket
 docs/specs/
 ```

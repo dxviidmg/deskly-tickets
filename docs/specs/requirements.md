@@ -35,6 +35,18 @@ Criterios de aceptación:
 7. Cuando un cliente envía `PATCH /api/tickets/{id}` con campos válidos, el
    sistema deberá actualizar solo los campos provistos y refrescar
    `actualizado_en`.
+8. Cuando un usuario autenticado está en el listado de tickets (`/`), el sistema
+   deberá mostrar un botón "Nuevo ticket" que abra un modal con un formulario
+   de creación (título, descripción y prioridad).
+9. Cuando el usuario envía el formulario del modal con datos válidos, el sistema
+   deberá crear el ticket vía `POST /api/tickets` **sin asignar**
+   (`asignado_a_id = null`), cerrar el modal, mostrar un aviso de éxito (toast) y
+   reflejar el nuevo ticket en el listado. La asignación se hace después desde el
+   listado o el detalle.
+10. Cuando el formulario del modal tiene datos inválidos, el sistema deberá
+    mostrar los errores de validación junto a cada campo y no enviar la petición.
+11. Cuando el modal está abierto, el usuario deberá poder cerrarlo con el botón
+    de cierre, con la tecla `Escape` o haciendo clic fuera del cuadro de diálogo.
 
 ---
 

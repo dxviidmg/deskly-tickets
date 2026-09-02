@@ -75,6 +75,9 @@ Añadidas tras completar el núcleo, cada una con su spec (requisitos + diseño)
 - [x] Pipeline de CI (lint + tests).
 - [ ] `feat(api): add GET /api/users/options for assignee autocomplete`
 - [ ] `feat(web): assignee autocomplete on ticket detail ("asignarme a mí" + search)`
+- [ ] `feat(web): create-ticket modal from the ticket list header`
+  - Botón "Nuevo ticket" en la cabecera del listado que abre un `Modal` genérico
+    con `CreateTicketModal` (react-hook-form + Zod). Al crear, refresca la lista.
 
 ---
 
