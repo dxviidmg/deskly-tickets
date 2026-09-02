@@ -41,7 +41,13 @@ async def test_authenticated_user_can_list_tickets(admin_client):
 async def test_admin_can_create_user(admin_client):
     resp = await admin_client.post(
         "/api/users",
-        json={"email": "new@test.com", "password": "secret123", "is_admin": False},
+        json={
+            "email": "new@test.com",
+            "password": "secret123",
+            "nombre": "Nuevo",
+            "apellidos": "Usuario",
+            "is_admin": False,
+        },
     )
     assert resp.status_code == 201
     assert resp.json()["email"] == "new@test.com"

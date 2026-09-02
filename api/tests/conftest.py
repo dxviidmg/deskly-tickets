@@ -21,10 +21,24 @@ from sqlalchemy.pool import StaticPool
 
 WEBHOOK_SECRET = "test-secret"
 
-# Ensure the app's HMAC secret matches the one tests sign with. Set before the
-# app (and its settings) are imported anywhere.
+# La configuración (app/config.py) ya no tiene valores por defecto: TODAS las
+# variables son obligatorias y deben venir del entorno. En tests las fijamos
+# aquí, ANTES de importar la app (y por tanto sus settings). Esto además hace
+# los tests independientes de cualquier api/.env (que no se versiona y no existe
+# en CI). Las variables de entorno tienen prioridad sobre el archivo .env.
 os.environ["WEBHOOK_SECRET"] = WEBHOOK_SECRET
 os.environ["JWT_SECRET"] = "test-jwt-secret"
+# Base de datos / Redis: los tests usan SQLite en memoria vía dependency
+# override, pero Settings igual exige estos valores al importarse.
+os.environ["DATABASE_URL"] = "postgresql+asyncpg://test:test@localhost:5432/test"
+os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+# Resto de obligatorias (no sensibles) con valores de test.
+os.environ["WEBHOOK_MAX_AGE_SECONDS"] = "300"
+os.environ["CORS_ORIGINS"] = "http://localhost:3000"
+os.environ["JWT_ALGORITHM"] = "HS256"
+os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "60"
+os.environ["ADMIN_EMAIL"] = "admin@test.com"
+os.environ["ADMIN_PASSWORD"] = "secret123"
 # Do not run the startup seed during tests.
 os.environ["DESKLY_SEED"] = "false"
 
@@ -76,7 +90,13 @@ async def _create_user(TestSession, email: str, password: str, is_admin: bool):
 
     async with TestSession() as session:
         user = User(
-            email=email, hashed_password=hash_password(password), is_admin=is_admin
+            email=email,
+            hashed_password=hash_password(password),
+            is_admin=is_admin,
+            # nombre y apellidos son NOT NULL en el modelo User; los tests no los
+            # usan pero deben proveerse para satisfacer la restricción.
+            nombre="Test",
+            apellidos="User",
         )
         session.add(user)
         await session.commit()
