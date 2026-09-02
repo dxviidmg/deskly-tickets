@@ -34,18 +34,31 @@ export const TOKEN_COOKIE = "deskly_token";
 
 /**
  * Devuelve la URL base de la API.
- * - En el servidor: usa API_INTERNAL_URL o NEXT_PUBLIC_API_URL
- * - En el navegador: usa NEXT_PUBLIC_API_URL
+ * - En el servidor (SSR): usa API_INTERNAL_URL, o NEXT_PUBLIC_API_URL como respaldo.
+ * - En el navegador: usa NEXT_PUBLIC_API_URL.
+ *
+ * Regla del proyecto: ninguna URL se hardcodea en el código. Si la variable de
+ * entorno no está definida, lanzamos un error claro (fail-fast) en vez de usar
+ * una URL por defecto oculta. Las variables se definen en web/.env (runtime SSR)
+ * y como build args NEXT_PUBLIC_* (build-time del navegador).
  */
 function baseUrl(): string {
   if (typeof window === "undefined") {
-    return (
-      process.env.API_INTERNAL_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      "http://localhost:8000"
+    const url = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
+    if (!url) {
+      throw new Error(
+        "Falta configuración: define API_INTERNAL_URL o NEXT_PUBLIC_API_URL (ver web/.env)."
+      );
+    }
+    return url;
+  }
+  const url = process.env.NEXT_PUBLIC_API_URL;
+  if (!url) {
+    throw new Error(
+      "Falta configuración: define NEXT_PUBLIC_API_URL en build-time (ver web/.env)."
     );
   }
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  return url;
 }
 
 /**

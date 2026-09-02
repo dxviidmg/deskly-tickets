@@ -25,13 +25,19 @@ import type { TicketEvent } from "@/lib/types";
 export type ConnectionStatus = "conectando" | "conectado" | "desconectado";
 
 /**
- * Devuelve la URL del WebSocket.
- * Usa la variable de entorno NEXT_PUBLIC_WS_URL o localhost por defecto.
+ * Devuelve la URL del WebSocket desde NEXT_PUBLIC_WS_URL.
+ *
+ * Regla del proyecto: ninguna URL se hardcodea. Si la variable no está definida
+ * (build-time), lanzamos un error claro en vez de usar un valor por defecto.
  */
 function wsUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/tickets"
-  );
+  const url = process.env.NEXT_PUBLIC_WS_URL;
+  if (!url) {
+    throw new Error(
+      "Falta configuración: define NEXT_PUBLIC_WS_URL en build-time (ver web/.env)."
+    );
+  }
+  return url;
 }
 
 /**
