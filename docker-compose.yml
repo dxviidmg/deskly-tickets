@@ -30,12 +30,10 @@ services:
   # Alpine es una versión tiny de Linux (~50MB vs 300MB)
   db:
     image: postgres:16-alpine
-    environment:
-      # Variables de PostgreSQL (usuario, contraseña, BD por defecto)
-      # Los valores vienen de .env o usan los defaults aquí
-      POSTGRES_USER: ${POSTGRES_USER:-deskly}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-deskly}
-      POSTGRES_DB: ${POSTGRES_DB:-deskly}
+    env_file:
+      # POSTGRES_USER/PASSWORD/DB vienen de api/.env (misma fuente que el
+      # backend, para no duplicar credenciales). Postgres los lee al inicializarse.
+      - ./api/.env
     volumes:
       # Volumen persistente: los datos sobreviven si se para el contenedor
       # Sin esto, cada "docker compose up" estaría con BD vacía
@@ -44,7 +42,9 @@ services:
       # Verificación de salud: ¿está PostgreSQL listo para conexiones?
       # Se ejecuta cada 5s, timeout 5s, reintentos 10
       # Si falla 10 veces = servicio considerado unhealthy
-      # El api NO arrancará hasta que db sea healthy
+      # El api NO arrancará hasta que db sea healthy.
+      # ${POSTGRES_*:-deskly} se interpola en build-time del YAML; usamos el
+      # mismo default (deskly) que en api/.env para que coincida.
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deskly} -d ${POSTGRES_DB:-deskly}"]
       interval: 5s
       timeout: 5s
@@ -74,30 +74,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      # Variables de configuración de la app (ver app/config.py)
-      # Conexión a BD: dentro del network Docker se llama "db"
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://deskly:deskly@db:5432/deskly}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      
-      # Seguridad: secretos para webhooks y JWT (CAMBIAR EN PRODUCCIÓN)
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change-me}
-      WEBHOOK_MAX_AGE_SECONDS: ${WEBHOOK_MAX_AGE_SECONDS:-300}
-      
-      # CORS: qué orígenes pueden acceder a la API (localhost:3000 en dev)
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
-      
-      # Seed: crear datos de ejemplo al arrancar (desabilitar en producción)
-      DESKLY_SEED: ${DESKLY_SEED:-true}
-      
-      # JWT: configuración de tokens de autenticación
-      JWT_SECRET: ${JWT_SECRET:-change-me-too}
-      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
-      
-      # Usuario admin inicial
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@deskly.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+    env_file:
+      # Única fuente de verdad de las variables del backend: api/.env.
+      # Incluye DATABASE_URL y REDIS_URL, que usan el NOMBRE del servicio Docker
+      # ("db"/"redis") como host, porque el backend corre dentro de la red
+      # Docker. Sin bloque "environment" duplicado: cero repetición de variables.
+      - ./api/.env
     ports:
       # Exponer puerto 8000 del contenedor en el host
       # Acceso: http://localhost:8000 (desde fuera del Docker)
@@ -111,23 +93,25 @@ services:
     build:
       context: ./web
       args:
-        # Estas URLs se "hornean" (bake) en el bundle de JavaScript en build-time
-        # El navegador las usa para conectar al API y WebSocket
-        # En producción: apuntar a dominio real (ej: https://api.example.com)
+        # NEXT_PUBLIC_*: se "hornean" (bake) en el bundle de JavaScript en
+        # BUILD-TIME (no en runtime), por eso van aquí como build args y NO en
+        # env_file. El navegador las usa para conectar al API y al WebSocket.
+        #
+        # En dev/entrega apuntan a localhost (el navegador del host accede por
+        # los puertos publicados). Para staging/producción se sobrescriben al
+        # construir la imagen:
+        #   docker compose build --build-arg NEXT_PUBLIC_API_URL=https://api.midominio.com web
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8000/ws/tickets}
     depends_on:
       # El web arranca después del api (aunque sea automático)
       - api
-    environment:
-      # Configuración para Next.js server-side rendering (SSR)
-      # API_INTERNAL_URL: usado por Node.js en el servidor (dentro del Docker network)
-      #                   "api" es el nombre del servicio en Docker network
-      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:8000}
-      
-      # Public URLs: usadas por el navegador (cliente)
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:8000/ws/tickets}
+    env_file:
+      # Variables de RUNTIME del frontend (las lee el servidor Next en SSR).
+      # Contiene API_INTERNAL_URL=http://api:8000 (el SSR llama al backend por
+      # el nombre del servicio dentro de la red Docker, no por localhost).
+      # Fuente de verdad separada del backend, sin duplicación.
+      - ./web/.env
     ports:
       # Puerto 3000: acceso http://localhost:3000
       - "3000:3000"

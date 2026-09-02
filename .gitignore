@@ -16,11 +16,13 @@ npm-debug.log*
 yarn-error.log*
 
 # Env / secrets
+# Ignora cualquier .env (raíz o subcarpetas: api/.env, web/.env), pero
+# SIEMPRE versiona los .env.example (plantillas sin secretos).
 .env
 *.env
-.env.local
-**/.env.local
+**/.env
 !.env.example
+!**/.env.example
 
 # OS / editor
 .DS_Store
