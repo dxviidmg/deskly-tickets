@@ -1160,3 +1160,30 @@ atributo privado del manager de WebSocket en el health check.
 
 Verificado: 26 tests pasan; `ruff` sin errores nuevos en los archivos tocados;
 `docker compose config` válido; `Settings` parsea `deskly_seed` como bool.
+
+---
+
+### [Decisión] Crear tickets desde el listado con un modal (sin asignar)
+
+**Contexto:** Hasta ahora los tickets solo se creaban por API o webhook. Se pidió
+un botón en el listado que abriera un modal para crearlos desde la interfaz. El
+backend ya exponía `POST /api/tickets` (solo requiere autenticación), así que la
+feature era puramente de frontend.
+
+**Uso de LLM:** Le pedí implementar el botón + modal siguiendo los patrones del
+proyecto (react-hook-form + Zod, toasts con sonner), sin añadir dependencias.
+
+**Salida del modelo:** Propuso un componente `Modal` genérico reutilizable
+(overlay, cierre con Escape/clic fuera/botón, bloqueo del scroll del body) y un
+`CreateTicketModal` con el formulario validado por el `ticketCreateSchema` ya
+existente. En un primer planteamiento incluía un selector de asignado opcional.
+
+**Mi decisión:** Adopté el `Modal` genérico y el `CreateTicketModal`, pero decidí
+que los tickets se crean **siempre sin asignar** (`asignado_a_id = null`), igual
+que los que entran por webhook: la asignación es una acción posterior que ya
+existe en el listado y en el detalle. Por eso el formulario solo pide título,
+descripción y prioridad, y el método `api.createTicket` no acepta `asignado_a_id`.
+Tras crear, se muestra un toast de éxito y se recarga la lista con `load()`
+(consistente con el servidor y sin depender del evento WebSocket). No se añadieron
+dependencias; se reutilizaron el schema Zod, `PRIORIDADES_LABELS` y el `Toaster`
+ya montado en el layout.
