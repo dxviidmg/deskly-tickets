@@ -29,12 +29,18 @@ from app.db import get_session
 from app.deps import get_current_user
 from app.models import User
 from app.schemas import LoginIn, Token, UserOut
-from app.security import create_access_token, verify_password
+from app.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(
     prefix="/api/auth",
     tags=["auth"],
 )
+
+# Hash señuelo para mitigar timing attacks en el login: cuando el email no
+# existe, verificamos la contraseña contra este hash para que el coste de
+# cómputo (y por tanto el tiempo de respuesta) sea comparable al de un usuario
+# real. Se calcula una sola vez al importar el módulo.
+_DUMMY_HASH = hash_password("timing-attack-mitigation-dummy-password")
 
 
 @router.post("/login", response_model=Token)
@@ -78,17 +84,28 @@ async def login(
     user = await session.scalar(
         select(User).where(User.email == payload.email)
     )
-    
-    # Si no existe el usuario: 401
-    if user is None or not verify_password(payload.password, user.hashed_password):
+
+    # Verificación de contraseña con mitigación de "timing attack":
+    # Si el usuario NO existe, igualmente ejecutamos verify_password contra un
+    # hash señuelo (_DUMMY_HASH). Así el tiempo de respuesta es similar exista o
+    # no el usuario, evitando que un atacante deduzca qué emails están
+    # registrados midiendo la latencia. El resultado siempre será 401.
+    if user is None:
+        verify_password(payload.password, _DUMMY_HASH)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos",
         )
-    
+
+    if not verify_password(payload.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email o contraseña incorrectos",
+        )
+
     # Generar token JWT
     token = create_access_token(subject=str(user.id))
-    
+
     # Devolver token
     return Token(access_token=token)
 
