@@ -189,7 +189,7 @@ async def seed() -> None:
             "Problema con el pago",
             "La búsqueda no devuelve resultados",
             "Se pierde la sesión al recargar",
-            "El dashboard muestra datos incorrectos",
+            "El listado de tickets muestra datos incorrectos",
             "No se aplican los filtros",
         ]
 

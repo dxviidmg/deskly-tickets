@@ -43,7 +43,7 @@ class Prioridad(str, Enum):
     
     Se usan para:
     - Ordenar el trabajo: qué tickets resolver primero
-    - Filtrar: mostrar solo tickets urgentes en el dashboard
+    - Filtrar: mostrar solo tickets urgentes en el listado
     - SLA: tickets urgentes tienen deadline más corto
     
     Valores (de menor a mayor):

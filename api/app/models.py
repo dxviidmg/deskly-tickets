@@ -118,8 +118,8 @@ class Ticket(Base):
     
     Tabla: tickets
     Índices:
-    - Por estado: dashboard filtra mucho por estado
-    - Por prioridad: dashboard filtra por prioridad
+    - Por estado: el listado filtra mucho por estado
+    - Por prioridad: el listado filtra por prioridad
     - Por asignado_a_id: para consultas "tickets de usuario X"
     """
     __tablename__ = "tickets"
