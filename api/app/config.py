@@ -26,66 +26,74 @@ class Settings(BaseSettings):
     2. Archivo .env en la raíz del proyecto (ej: .env)
     3. Valores por defecto definidos aquí
     
-    Ejemplo en .env:
-        DATABASE_URL=postgresql+asyncpg://usuario:contraseña@localhost/base_datos
-        REDIS_URL=redis://localhost:6379/0
-        JWT_SECRET=mi-secreto-muy-seguro
+    Ejemplo de variables en el .env (los valores reales NUNCA se ponen aquí en
+    el código; ver api/.env.example para las claves y api/.env para los valores):
+        DATABASE_URL, REDIS_URL, JWT_SECRET, WEBHOOK_SECRET, ...
     """
 
     # Configuración de Pydantic: de dónde cargar el archivo
     model_config = SettingsConfigDict(
-        env_file=".env",                    # Archivo a leer
+        env_file=".env",                    # Archivo a leer (api/.env)
         env_file_encoding="utf-8",          # Codificación
-        extra="forbid"                      # Rechazar variables no definidas
+        # "ignore": ignora variables del .env que no son campos de Settings.
+        # api/.env es compartido: contiene también POSTGRES_USER/PASSWORD/DB, que
+        # los lee el contenedor de Postgres pero NO la app. Con "forbid" pydantic
+        # las rechazaría. "ignore" permite un único .env por servicio sin duplicar.
+        extra="ignore",
     )
 
     # ========== BASE DE DATOS ==========
     # URL de conexión a PostgreSQL con asyncpg (driver asíncrono para Python)
     # Formato: postgresql+asyncpg://usuario:contraseña@host:puerto/base_datos
-    database_url: str = "postgresql+asyncpg://deskly:deskly@db:5432/deskly"
+    # Obligatorio: sin valor por defecto. Debe venir del .env (o del entorno).
+    database_url: str
 
     # ========== REDIS ==========
     # URL para conectar a Redis (usado para pub/sub de WebSocket)
     # Redis es un almacén de datos en memoria muy rápido, ideal para eventos en tiempo real.
-    # Si no está configurado, el WebSocket funciona solo localmente (sin fan-out entre instancias).
-    redis_url: str = "redis://redis:6379/0"
+    # Obligatorio: debe venir del .env (o del entorno).
+    redis_url: str
 
     # ========== WEBHOOK ==========
-    # Secreto compartido para verificar la firma HMAC-SHA256 de los webhooks
-    # El cliente debe firmar cada petición con este secreto, y nosotros lo verificamos
-    # para asegurar que la petición realmente viene de quien dice ser
-    webhook_secret: str = "change-me"
+    # Secreto compartido para verificar la firma HMAC-SHA256 de los webhooks.
+    # Obligatorio y SIN default: un secreto nunca debe tener valor por defecto en
+    # el código (si se olvida configurarlo, la app arrancaría insegura). Al no
+    # tener default, la app falla al arrancar si falta, forzando a definirlo en
+    # el .env. Debe coincidir con el secreto del proveedor que envía el webhook.
+    webhook_secret: str
 
     # Edad máxima (en segundos) que aceptamos para un timestamp de webhook
     # Esto protege contra ataques de replay: alguien no puede reutilizar una petición vieja
-    webhook_max_age_seconds: int = 300
+    # Obligatorio: debe venir del .env.
+    webhook_max_age_seconds: int
 
     # ========== CORS ==========
-    # Lista de orígenes (dominios) permitidos para hacer requests a la API
-    # Por defecto: solo localhost:3000 (el frontend local)
+    # Lista de orígenes (dominios) permitidos para hacer requests a la API.
     # Múltiples orígenes se separan por coma: "http://localhost:3000, https://example.com"
-    cors_origins: str = "http://localhost:3000"
+    # Obligatorio: debe venir del .env.
+    cors_origins: str
 
     # ========== AUTENTICACIÓN (JWT) ==========
-    # Secreto usado para firmar los tokens JWT (JSON Web Tokens)
-    # Los tokens se usan para que el cliente no tenga que enviar contraseña en cada request
-    # Formato JWT: header.payload.signature (la firma usa este secreto)
-    jwt_secret: str = "change-me-too"
+    # Secreto usado para firmar los tokens JWT (JSON Web Tokens).
+    # Obligatorio y SIN default: igual que webhook_secret, un secreto de firma
+    # nunca debe tener valor por defecto. Con default, cualquiera que conozca ese
+    # valor (estaría en el repo) podría falsificar tokens y suplantar usuarios.
+    jwt_secret: str
 
     # Algoritmo criptográfico para firmar JWT (recomendado: HS256 o RS256)
-    jwt_algorithm: str = "HS256"
+    # Obligatorio: debe venir del .env.
+    jwt_algorithm: str
 
     # Tiempo en minutos hasta que un token JWT expira y deja de ser válido
-    access_token_expire_minutes: int = 60
+    # Obligatorio: debe venir del .env.
+    access_token_expire_minutes: int
 
     # ========== SEED / DATOS INICIALES ==========
-    # Email del usuario administrador que se crea al arrancar
-    # Se puede cambiar aquí o en la variable de entorno ADMIN_EMAIL
-    admin_email: str = "admin@deskly.com"
-
-    # Contraseña inicial del administrador
-    # IMPORTANTE: cambiar en producción
-    admin_password: str = "admin123"
+    # Email y contraseña del usuario administrador que se crea al arrancar.
+    # Obligatorios: deben venir del .env. La contraseña, en particular, no debe
+    # tener default en el código.
+    admin_email: str
+    admin_password: str
 
     @property
     def cors_origins_list(self) -> list[str]:
